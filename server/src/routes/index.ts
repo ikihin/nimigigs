@@ -11,6 +11,7 @@ import {
   updateProfile,
   getUser,
   disconnectOAuthProvider,
+  loginWithWallet,
 } from '../services/users.js'
 import { ledgerForUser, REFERRAL_CAP_PER_MONTH, REFERRAL_PAIR } from '../services/credits.js'
 import {
@@ -91,6 +92,29 @@ api.post('/auth/login', async (c) => {
 
 api.get('/auth/me', requireAuth, async (c) => {
   return c.json({ user: await toPublicUser(c.get('user')) })
+})
+
+api.post('/auth/wallet', async (c) => {
+  const body = await c.req.json<{
+    address: string
+    message: string
+    signature: string
+    publicKey?: string
+    method: string
+  }>()
+  if (!body.address || !body.signature) return err(c, 'INVALID_INPUT', 'Address and signature required', 400)
+  try {
+    const user = await loginWithWallet(body.address, {
+      message: body.message,
+      signature: body.signature,
+      publicKey: body.publicKey,
+      method: body.method,
+    })
+    const token = await createSession(user.id)
+    return c.json({ token, user: await toPublicUser(user) })
+  } catch (e) {
+    return err(c, 'AUTH_FAILED', e instanceof Error ? e.message : 'Wallet auth failed', 401)
+  }
 })
 
 // ── Me ────────────────────────────────────────────────
@@ -199,11 +223,15 @@ api.get('/oauth/:provider/start', async (c) => {
   if (provider !== 'twitter' && provider !== 'github') {
     return err(c, 'INVALID_PROVIDER', 'Use twitter or github', 400)
   }
+
   const user = await resolveUserFromOAuthStart(
     c.req.header('authorization'),
     c.req.query('token'),
   )
-  if (!user) return err(c, 'UNAUTHORIZED', 'Login required', 401)
+
+  if (!user) {
+    return err(c, 'UNAUTHORIZED', 'Login required', 401)
+  }
 
   if (provider === 'github') {
     if (!config.github.enabled()) {
@@ -222,19 +250,21 @@ api.get('/oauth/:provider/start', async (c) => {
     return c.json({ url, provider: 'github' })
   }
 
-  if (!config.twitter.enabled()) {
-    return err(
-      c,
-      'OAUTH_NOT_CONFIGURED',
-      'Set TWITTER_CLIENT_ID and TWITTER_CLIENT_SECRET on the server',
-      503,
-    )
+  if (provider === 'twitter') {
+    if (!config.twitter.enabled()) {
+      return err(
+        c,
+        'OAUTH_NOT_CONFIGURED',
+        'Set TWITTER_CLIENT_ID and TWITTER_CLIENT_SECRET on the server',
+        503,
+      )
+    }
+    const { codeVerifier, codeChallenge } = createPkce()
+    const state = createOAuthState(user.id, 'twitter', codeVerifier)
+    const url = twitterAuthUrl(state, codeChallenge)
+    if (c.req.query('redirect') === '1') return c.redirect(url)
+    return c.json({ url, provider: 'twitter' })
   }
-  const { codeVerifier, codeChallenge } = createPkce()
-  const state = createOAuthState(user.id, 'twitter', codeVerifier)
-  const url = twitterAuthUrl(state, codeChallenge)
-  if (c.req.query('redirect') === '1') return c.redirect(url)
-  return c.json({ url, provider: 'twitter' })
 })
 
 api.get('/oauth/github/callback', async (c) => {
@@ -250,7 +280,7 @@ api.get('/oauth/github/callback', async (c) => {
     )
   }
   const st = takeOAuthState(state)
-  if (!st || st.provider !== 'github') {
+  if (!st || st.provider !== 'github' || !st.userId) {
     return c.redirect(
       oauthFrontendRedirect({ ok: false, provider: 'github', error: 'invalid_state' }),
     )
@@ -280,7 +310,7 @@ api.get('/oauth/twitter/callback', async (c) => {
     )
   }
   const st = takeOAuthState(state)
-  if (!st || st.provider !== 'twitter') {
+  if (!st || st.provider !== 'twitter' || !st.userId) {
     return c.redirect(
       oauthFrontendRedirect({ ok: false, provider: 'twitter', error: 'invalid_state' }),
     )

@@ -54,11 +54,11 @@ export function Landing() {
               },
               {
                 t: 'Submit with credits',
-                d: '4 credits each month. Quality over spam. Win to earn more credits back.',
+                d: 'Creators get 4 credits each month. Quality over spam. Win tasks to earn back more.',
               },
               {
                 t: 'Get paid on-chain',
-                d: 'Sponsors lock USDT or NIM. Pick 1st / 2nd / 3rd. Rewards release to your wallet.',
+                d: 'Sponsors lock USDT or NIM. Pick winners. Rewards release automatically to your address.',
               },
             ].map((x) => (
               <div key={x.t} className="glass-card">
@@ -73,13 +73,13 @@ export function Landing() {
         <aside className="dash-side">
           <div className="glass-card credit-card">
             <div className="credit-card__head">
-              <span>Demo ready</span>
+              <span>Monthly Grant</span>
               <span style={{ color: 'var(--primary)' }}>⚡</span>
             </div>
             <div className="credit-card__num">4</div>
-            <p className="credit-card__sub">credits · every new account</p>
+            <p className="credit-card__sub">credits · creators · monthly reset</p>
             <Link to="/login" className="btn btn-primary btn-sm" style={{ width: '100%', marginTop: 8 }}>
-              Try demo login
+              Get Started
             </Link>
           </div>
           <div className="glass-card">

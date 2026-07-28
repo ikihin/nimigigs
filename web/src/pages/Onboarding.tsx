@@ -1,134 +1,159 @@
 import { useEffect, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { useWallet } from '../context/WalletContext'
 import { api } from '../lib/api'
-import { HUB_ENDPOINT } from '../lib/hub'
-import { isInsideNimiqPay } from '../lib/nimiq'
+
+type OnboardingStep = 'role' | 'profile' | 'social'
 
 export function Onboarding() {
-  const { user, token, refreshUser } = useAuth()
-  const { displayAddress, connectWallet, isDemo, status } = useWallet()
+  const { user, token, setUser, loading } = useAuth()
   const nav = useNavigate()
-  const [error, setError] = useState<string | null>(null)
+  const [step, setStep] = useState<OnboardingStep>('role')
   const [busy, setBusy] = useState(false)
-  const [oauth, setOauth] = useState<{ github: boolean; twitter: boolean } | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  
+  // Profile state
+  const [displayName, setDisplayName] = useState(user?.displayName || '')
 
   useEffect(() => {
-    void api
-      .oauthStatus()
-      .then((s) => setOauth({ github: s.github, twitter: s.twitter }))
-      .catch(() => null)
-    void refreshUser()
-  }, [refreshUser])
+    if (!token) return
+    void api.oauthStatus().then(() => null).catch(() => null)
+  }, [token])
 
+  if (loading) return <div className="auth-shell"><p className="muted">Loading account…</p></div>
   if (!user || !token) return <Navigate to="/login" replace />
 
-  async function onConnectWallet() {
+  async function onSelectRole(role: 'freelance' | 'sponsor') {
     setBusy(true)
     setError(null)
     try {
-      await connectWallet()
+      const { user: u } = await api.patchMe(token!, { defaultRole: role })
+      setUser(u)
+      setStep('profile')
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Wallet failed')
+      setError(e instanceof Error ? e.message : 'Failed to set role')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function onSaveProfile(e: React.FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    setError(null)
+    try {
+      const { user: u } = await api.patchMe(token!, { displayName })
+      setUser(u)
+      setStep('social')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to save profile')
     } finally {
       setBusy(false)
     }
   }
 
   async function startOAuth(provider: 'twitter' | 'github') {
-    if (!token) return
     setBusy(true)
-    setError(null)
     try {
-      const { url } = await api.oauthStart(token, provider)
+      const { url } = await api.oauthStart(token!, provider)
       window.location.href = url
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'OAuth start failed')
+      setError(e instanceof Error ? e.message : 'OAuth failed')
       setBusy(false)
     }
   }
 
-  const linked = Boolean(user.nimiqAddress)
-
   return (
-    <div>
-      <h1 className="page-title">Welcome to NimGigs</h1>
-      <p className="muted">You start with 4 credits this month.</p>
+    <div className="auth-shell" style={{ maxWidth: '400px' }}>
+      <div className="auth-brand">
+        <img src="/ng-mark.svg" alt="NimGigs" className="auth-logo-only" />
+        <h2>Setup your profile</h2>
+      </div>
+
       {error && <div className="alert error">{error}</div>}
 
-      <div className="glass-card" style={{ marginBottom: 14 }}>
-        <h3>1. Connect Nimiq wallet</h3>
-        <p className="muted">
-          Sign a message via Nimiq Pay or{' '}
-          <a href={HUB_ENDPOINT} target="_blank" rel="noreferrer">
-            hub.nimiq.com
-          </a>
-          .
-        </p>
-        {isDemo && !isInsideNimiqPay() && (
-          <div className="alert info">Browser mode — allow Hub popups.</div>
-        )}
-        <p className="locked">{user.nimiqAddress || displayAddress || 'Not connected'}</p>
-        <button
-          className="btn btn-primary"
-          type="button"
-          disabled={busy || status === 'connecting'}
-          onClick={onConnectWallet}
-        >
-          {status === 'connecting'
-            ? 'Waiting for wallet…'
-            : linked
-              ? 'Reconnect / re-sign'
-              : 'Connect Nimiq wallet'}
-        </button>
-      </div>
-
-      <div className="glass-card">
-        <h3>2. Link social (OAuth)</h3>
-        <p className="muted">Required for bounties that ask for Twitter or GitHub verification.</p>
-
-        <div className="social-row">
-          <div className="social-card">
-            <div>
-              <strong>X / Twitter</strong>
-              <p className="muted" style={{ margin: '4px 0 0' }}>
-                {user.twitter ? `@${user.twitter}` : 'Not connected'}
-              </p>
-            </div>
+      {step === 'role' && (
+        <div className="glass-card animate-in">
+          <h3>I want to...</h3>
+          <p className="muted">Choose your primary role. You can change this later.</p>
+          <div className="column" style={{ gap: '12px', marginTop: '20px' }}>
             <button
-              type="button"
-              className="btn btn-primary btn-sm"
-              disabled={busy || (oauth !== null && !oauth.twitter)}
-              onClick={() => startOAuth('twitter')}
+              className="btn btn-primary btn-block btn-lg"
+              onClick={() => onSelectRole('freelance')}
+              disabled={busy}
             >
-              {user.twitter ? 'Reconnect X' : 'Connect X'}
+              🚀 Earn Rewards (Creator)
             </button>
-          </div>
-          <div className="social-card">
-            <div>
-              <strong>GitHub</strong>
-              <p className="muted" style={{ margin: '4px 0 0' }}>
-                {user.github ? `@${user.github}` : 'Not connected'}
-              </p>
-            </div>
             <button
-              type="button"
-              className="btn btn-primary btn-sm"
-              disabled={busy || (oauth !== null && !oauth.github)}
-              onClick={() => startOAuth('github')}
+              className="btn btn-ghost btn-block btn-lg"
+              onClick={() => onSelectRole('sponsor')}
+              disabled={busy}
             >
-              {user.github ? 'Reconnect GitHub' : 'Connect GitHub'}
+              🤝 Post Tasks (Sponsor)
             </button>
           </div>
         </div>
+      )}
 
-        <div className="row" style={{ marginTop: 16 }}>
-          <button className="btn btn-primary" type="button" onClick={() => nav('/board')}>
-            Go to board
+      {step === 'profile' && (
+        <form className="glass-card animate-in" onSubmit={onSaveProfile}>
+          <h3>Your profile</h3>
+          <p className="muted">How should we call you?</p>
+          <div className="field">
+            <label>Display Name</label>
+            <input
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              placeholder="e.g. Satoshi"
+              required
+            />
+          </div>
+          <button className="btn btn-primary btn-block" type="submit" disabled={busy}>
+            Continue
           </button>
+        </form>
+      )}
+
+      {step === 'social' && (
+        <div className="glass-card animate-in">
+          <h3>Connect Socials</h3>
+          <p className="muted">Link your accounts to verify your identity.</p>
+          
+          <div className="social-row" style={{ marginTop: '16px' }}>
+            <div className="social-card">
+              <strong>X / Twitter</strong>
+              <button
+                className={`btn btn-sm ${user.twitter ? 'btn-ghost' : 'btn-primary'}`}
+                onClick={() => startOAuth('twitter')}
+                disabled={busy}
+              >
+                {user.twitter ? `@${user.twitter}` : 'Link X'}
+              </button>
+            </div>
+            <div className="social-card">
+              <strong>GitHub</strong>
+              <button
+                className={`btn btn-sm ${user.github ? 'btn-ghost' : 'btn-primary'}`}
+                onClick={() => startOAuth('github')}
+                disabled={busy}
+              >
+                {user.github ? `@${user.github}` : 'Link GitHub'}
+              </button>
+            </div>
+          </div>
+
+          <div style={{ marginTop: '24px' }}>
+            <button className="btn btn-primary btn-block" onClick={() => nav('/board')}>
+              Complete Onboarding
+            </button>
+          </div>
+          {user.defaultRole === 'freelance' && (
+            <p className="muted" style={{ textAlign: 'center', fontSize: '0.8rem', marginTop: '12px' }}>
+              You have 4 credits to start earning!
+            </p>
+          )}
         </div>
-      </div>
+      )}
     </div>
   )
 }

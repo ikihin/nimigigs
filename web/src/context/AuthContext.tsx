@@ -20,6 +20,13 @@ interface AuthContextValue {
   loading: boolean
   setRole: (role: RolePref) => void
   login: (email: string, password: string) => Promise<void>
+  loginWithWallet: (proof: {
+    address: string
+    message: string
+    signature: string
+    publicKey?: string
+    method: string
+  }) => Promise<void>
   signup: (email: string, password: string, referralCode?: string) => Promise<void>
   logout: () => void
   refreshUser: () => Promise<void>
@@ -71,6 +78,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRole(res.user.defaultRole)
   }, [setRole])
 
+  const loginWithWallet = useCallback(async (proof: {
+    address: string
+    message: string
+    signature: string
+    publicKey?: string
+    method: string
+  }) => {
+    const res = await api.loginWithWallet(proof)
+    localStorage.setItem(TOKEN_KEY, res.token)
+    setToken(res.token)
+    setUser(res.user)
+    setRole(res.user.defaultRole)
+  }, [setRole])
+
   const signup = useCallback(
     async (email: string, password: string, referralCode?: string) => {
       const res = await api.signup({ email, password, referralCode })
@@ -96,6 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       setRole,
       login,
+      loginWithWallet,
       signup,
       logout,
       refreshUser,

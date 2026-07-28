@@ -10,7 +10,7 @@ import { IconSearch } from '../components/Icons'
 const CHIPS = ['all', 'bounty', 'quest', 'job'] as const
 
 export function Board() {
-  const { user, token, role } = useAuth()
+  const { user, token, role, loading } = useAuth()
   const [listings, setListings] = useState<Listing[]>([])
   const [chip, setChip] = useState<string>('all')
   const [q, setQ] = useState('')
@@ -59,6 +59,7 @@ export function Board() {
     return items
   }, [listings, currency, difficulty, sort])
 
+  if (loading) return <div style={{ padding: 40 }}><p className="muted">Loading…</p></div>
   if (!user) return <Navigate to="/login" replace />
 
   return (

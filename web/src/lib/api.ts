@@ -41,6 +41,18 @@ export const api = {
       body: JSON.stringify(body),
     })
   },
+  loginWithWallet(body: {
+    address: string
+    message: string
+    signature: string
+    publicKey?: string
+    method: string
+  }) {
+    return request<{ token: string; user: PublicUser }>('/auth/wallet', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    })
+  },
   me(token: string) {
     return request<{ user: PublicUser }>('/auth/me', { token })
   },

@@ -7,7 +7,7 @@ import { HUB_ENDPOINT } from '../lib/hub'
 import { isInsideNimiqPay } from '../lib/nimiq'
 
 export function Profile() {
-  const { user, token, setUser, refreshUser } = useAuth()
+  const { user, token, setUser, refreshUser, loading } = useAuth()
   const { connectWallet, displayAddress, isDemo, status, lastProof } = useWallet()
   const [params, setParams] = useSearchParams()
   const [msg, setMsg] = useState<string | null>(null)
@@ -42,6 +42,7 @@ export function Profile() {
     setParams(params, { replace: true })
   }, [params, setParams, refreshUser])
 
+  if (loading) return <div style={{ padding: 40 }}><p className="muted">Loading…</p></div>
   if (!user || !token) return <Navigate to="/login" replace />
 
   async function onConnectWallet() {

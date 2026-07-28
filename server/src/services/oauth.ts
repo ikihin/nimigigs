@@ -7,7 +7,7 @@ import type { OAuthProvider } from '../types.js'
 
 interface OAuthState {
   id: string
-  userId: string
+  userId?: string
   provider: OAuthProvider
   codeVerifier: string
   createdAt: number
@@ -37,7 +37,7 @@ export function createPkce() {
   return { codeVerifier, codeChallenge: challenge }
 }
 
-export function createOAuthState(userId: string, provider: OAuthProvider, codeVerifier: string) {
+export function createOAuthState(userId: string | undefined, provider: OAuthProvider, codeVerifier: string) {
   pruneStates()
   const id = nanoid(24)
   states.set(id, { id, userId, provider, codeVerifier, createdAt: Date.now() })

@@ -65,6 +65,16 @@ export async function findUserByEmail(email: string): Promise<User | null> {
   return data ? rowToUser(data) : null
 }
 
+export async function findUserByWalletAddress(address: string): Promise<User | null> {
+  const a = address.replace(/\s+/g, ' ').trim()
+  if (!useSupabase()) {
+    return [...store.users.values()].find((u) => u.nimiqAddress === a) ?? null
+  }
+  const { data, error } = await sb().from('users').select('*').eq('nimiq_address', a).maybeSingle()
+  if (error) throw new Error(error.message)
+  return data ? rowToUser(data) : null
+}
+
 export async function findUserIdByReferral(code: string): Promise<string | null> {
   const c = code.trim().toUpperCase()
   if (!useSupabase()) return store.usersByReferral.get(c) ?? null
@@ -123,6 +133,27 @@ export async function getOAuthAccount(
     .select('*')
     .eq('user_id', userId)
     .eq('provider', provider)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  return data ? rowToOAuth(data) : null
+}
+
+export async function getOAuthAccountByProvider(
+  provider: OAuthProvider,
+  providerUserId: string,
+): Promise<OAuthAccount | null> {
+  if (!useSupabase()) {
+    return (
+      [...store.oauth.values()].find(
+        (a) => a.provider === provider && a.providerUserId === providerUserId,
+      ) ?? null
+    )
+  }
+  const { data, error } = await sb()
+    .from('oauth_accounts')
+    .select('*')
+    .eq('provider', provider)
+    .eq('provider_user_id', providerUserId)
     .maybeSingle()
   if (error) throw new Error(error.message)
   return data ? rowToOAuth(data) : null

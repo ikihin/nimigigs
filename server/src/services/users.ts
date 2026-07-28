@@ -7,9 +7,11 @@ import {
   deleteOAuth,
   findUserByEmail,
   findUserById,
+  findUserByWalletAddress,
   findUserIdByReferral,
   findUserIdBySession,
   getOAuthAccount,
+  getOAuthAccountByProvider,
   listReferralsByInvitee,
   referralCodeExists,
   saveOAuth,
@@ -206,3 +208,51 @@ export async function getOAuth(userId: string, provider: 'twitter' | 'github') {
 export async function disconnectOAuthProvider(userId: string, provider: 'twitter' | 'github') {
   await deleteOAuth(userId, provider)
 }
+
+export async function loginWithWallet(
+  address: string,
+  proof: { message: string; signature: string; publicKey?: string; method: string },
+): Promise<User> {
+  const existing = await findUserByWalletAddress(address)
+  if (existing) {
+    existing.walletProof = {
+      ...proof,
+      verifiedAt: new Date().toISOString(),
+    }
+    await saveUser(existing)
+    return existing
+  }
+
+  // New user by wallet
+  const id = nanoid()
+  const now = new Date().toISOString()
+  let code = makeReferralCode()
+  while (await referralCodeExists(code)) code = makeReferralCode()
+
+  // Use placeholder for email/pass
+  const user: User = {
+    id,
+    email: `${address.slice(0, 8)}@nimiq.wallet`, // Placeholder
+    passwordHash: 'wallet_authenticated',
+    emailVerifiedAt: now,
+    displayName: address.slice(0, 10), // Default name
+    defaultRole: 'freelance',
+    nimiqAddress: address.replace(/\s+/g, ' ').trim(),
+    walletProof: {
+      ...proof,
+      verifiedAt: now,
+    },
+    referralCode: code,
+    referredByUserId: null,
+    creditsBalance: MONTHLY_GRANT,
+    creditsMonth: currentMonthKey(),
+    referralCreditsMonth: 0,
+    referralInvitesMonth: 0,
+    createdAt: now,
+    updatedAt: now,
+  }
+
+  await saveUser(user)
+  return user
+}
+
