@@ -1,6 +1,7 @@
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { IconBell, IconMessage } from './Icons'
+import { PageTransition } from './PageTransition'
 
 export function Layout() {
   const { user, role, setRole, logout } = useAuth()
@@ -24,6 +25,7 @@ export function Layout() {
             <NavLink to="/board">Board</NavLink>
             <NavLink to="/my-work">My Work</NavLink>
             {role === 'sponsor' && <NavLink to="/sponsor">Sponsor</NavLink>}
+            <NavLink to="/messages">Messages</NavLink>
             <NavLink to="/profile">Profile</NavLink>
           </nav>
         )}
@@ -31,9 +33,9 @@ export function Layout() {
         <div className="topbar-actions">
           {user ? (
             <>
-              <button type="button" className="icon-btn" title="Messages" aria-label="Messages">
+              <NavLink to="/messages" className="icon-btn" title="Messages" aria-label="Messages">
                 <IconMessage size={18} />
-              </button>
+              </NavLink>
               <button type="button" className="icon-btn" title="Notifications" aria-label="Notifications">
                 <IconBell size={18} />
                 <span className="dot" />
@@ -82,7 +84,7 @@ export function Layout() {
         </div>
       </header>
 
-      <Outlet />
+      <PageTransition />
     </div>
   )
 }

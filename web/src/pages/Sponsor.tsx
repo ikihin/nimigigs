@@ -1,9 +1,10 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { api } from '../lib/api'
 import type { Listing, Submission } from '../lib/types'
 import { useAuth } from '../context/AuthContext'
 import { useWallet } from '../context/WalletContext'
+import { IconBriefcase, IconTrophy, IconUsers } from '../components/Icons'
 
 export function Sponsor() {
   const { user, token } = useAuth()
@@ -15,8 +16,8 @@ export function Sponsor() {
   const [manageId, setManageId] = useState<string | null>(null)
   const [subs, setSubs] = useState<Submission[]>([])
   const [ranks, setRanks] = useState<Record<string, 1 | 2 | 3 | 0>>({})
+  const [filter, setFilter] = useState<'all' | 'open' | 'paid' | 'pending_lock'>('all')
 
-  // form
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [type, setType] = useState<'bounty' | 'quest' | 'job'>('bounty')
@@ -40,6 +41,18 @@ export function Sponsor() {
     void load().catch((e) => setError(e instanceof Error ? e.message : 'Error'))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token])
+
+  const stats = useMemo(() => {
+    const open = listings.filter((l) => l.status === 'open').length
+    const paid = listings.filter((l) => l.status === 'paid').length
+    const locked = listings.reduce((s, l) => s + (l.escrowStatus === 'locked' ? l.escrowAmount : 0), 0)
+    return { open, paid, locked, total: listings.length }
+  }, [listings])
+
+  const visible = useMemo(() => {
+    if (filter === 'all') return listings
+    return listings.filter((l) => l.status === filter)
+  }, [listings, filter])
 
   if (!user || !token) return <Navigate to="/login" replace />
 
@@ -71,10 +84,8 @@ export function Sponsor() {
         requireGithub,
         rewards,
       })
-      // Lock: for NIM use Mini App pay; USDT demo tx hash in scaffold
       let tx = `demo_lock_${Date.now()}`
       if (currency === 'NIM') {
-        // Placeholder escrow recipient — replace with real escrow address
         const escrow = 'NQ07 ESCROW PLACEHOLDER ADDRESS 0000'
         tx = await payNim(listing.escrowAmount, escrow)
       }
@@ -120,149 +131,268 @@ export function Sponsor() {
     }
   }
 
+  const manageListing = listings.find((l) => l.id === manageId)
+
   return (
-    <div>
-      <h1 className="page-title">Sponsor</h1>
+    <div className="sponsor-page">
+      <section className="hero-panel sponsor-hero">
+        <div>
+          <div className="hero-kicker">Sponsor console</div>
+          <h1 className="hero-title" style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.6rem)' }}>
+            Lock rewards.
+            <br />
+            Pick winners.
+            <br />
+            <em>Ship talent.</em>
+          </h1>
+          <p className="hero-desc">
+            Create bounties with escrowed USDT or NIM. Review submissions and release multi-winner
+            payouts on Nimiq Pay.
+          </p>
+          <div className="hero-cta">
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => setShowCreate((v) => !v)}
+            >
+              {showCreate ? 'Close builder' : '+ Create bounty'}
+            </button>
+            <Link to="/board" className="btn btn-ghost">
+              View board
+            </Link>
+          </div>
+        </div>
+        <div className="sponsor-stats">
+          <div className="stat-tile">
+            <IconBriefcase size={18} />
+            <strong>{stats.total}</strong>
+            <span>Listings</span>
+          </div>
+          <div className="stat-tile">
+            <IconUsers size={18} />
+            <strong>{stats.open}</strong>
+            <span>Open</span>
+          </div>
+          <div className="stat-tile">
+            <IconTrophy size={18} />
+            <strong>{stats.paid}</strong>
+            <span>Paid out</span>
+          </div>
+          <div className="stat-tile stat-tile--glow">
+            <strong>{stats.locked}</strong>
+            <span>Escrow active</span>
+          </div>
+        </div>
+      </section>
+
       {error && <div className="alert error">{error}</div>}
       {ok && <div className="alert ok">{ok}</div>}
 
-      <button className="btn block" type="button" onClick={() => setShowCreate((v) => !v)}>
-        {showCreate ? 'Close form' : '+ Create listing'}
-      </button>
-
       {showCreate && (
-        <form className="card" onSubmit={create} style={{ marginTop: 12 }}>
-          <div className="field">
-            <label>Type</label>
-            <select value={type} onChange={(e) => setType(e.target.value as typeof type)}>
-              <option value="bounty">Bounty</option>
-              <option value="quest">Quest</option>
-              <option value="job">Job</option>
-            </select>
+        <form className="glass-card create-panel" onSubmit={create}>
+          <div className="create-panel__head">
+            <div>
+              <p className="section-label">New listing</p>
+              <h2 className="page-title" style={{ margin: 0, fontSize: '1.35rem' }}>
+                Bounty builder
+              </h2>
+            </div>
+            <span className="type-pill">{currency} lock</span>
           </div>
-          <div className="field">
-            <label>Title</label>
-            <input required value={title} onChange={(e) => setTitle(e.target.value)} />
-          </div>
-          <div className="field">
-            <label>Description</label>
-            <textarea required value={description} onChange={(e) => setDescription(e.target.value)} />
-          </div>
-          <div className="field">
-            <label>Category</label>
-            <select value={category} onChange={(e) => setCategory(e.target.value)}>
-              <option value="design">design</option>
-              <option value="content">content</option>
-              <option value="dev">dev</option>
-              <option value="other">other</option>
-            </select>
-          </div>
-          <div className="field">
-            <label>Currency</label>
-            <select value={currency} onChange={(e) => setCurrency(e.target.value as 'USDT' | 'NIM')}>
-              <option value="USDT">USDT</option>
-              <option value="NIM">NIM</option>
-            </select>
-          </div>
-          <div className="field">
-            <label>Winner mode</label>
-            <select value={winnerMode} onChange={(e) => setWinnerMode(e.target.value as typeof winnerMode)}>
-              <option value="top3">1st / 2nd / 3rd</option>
-              <option value="single">Single winner</option>
-            </select>
-          </div>
-          <div className="row">
-            <div className="field" style={{ flex: 1 }}>
-              <label>1st</label>
+
+          <div className="create-grid">
+            <div className="field">
+              <label>Type</label>
+              <select value={type} onChange={(e) => setType(e.target.value as typeof type)}>
+                <option value="bounty">Bounty</option>
+                <option value="quest">Quest</option>
+                <option value="job">Job</option>
+              </select>
+            </div>
+            <div className="field">
+              <label>Category</label>
+              <select value={category} onChange={(e) => setCategory(e.target.value)}>
+                <option value="design">design</option>
+                <option value="content">content</option>
+                <option value="dev">dev</option>
+                <option value="other">other</option>
+              </select>
+            </div>
+            <div className="field create-span-2">
+              <label>Title</label>
+              <input required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What needs shipping?" />
+            </div>
+            <div className="field create-span-2">
+              <label>Description</label>
+              <textarea
+                required
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Brief, deliverables, acceptance criteria…"
+              />
+            </div>
+            <div className="field">
+              <label>Currency</label>
+              <select value={currency} onChange={(e) => setCurrency(e.target.value as 'USDT' | 'NIM')}>
+                <option value="USDT">USDT</option>
+                <option value="NIM">NIM</option>
+              </select>
+            </div>
+            <div className="field">
+              <label>Winner mode</label>
+              <select value={winnerMode} onChange={(e) => setWinnerMode(e.target.value as typeof winnerMode)}>
+                <option value="top3">1st / 2nd / 3rd</option>
+                <option value="single">Single winner</option>
+              </select>
+            </div>
+            <div className="field">
+              <label>1st reward</label>
               <input type="number" min={1} value={r1} onChange={(e) => setR1(Number(e.target.value))} />
             </div>
             {winnerMode === 'top3' && (
               <>
-                <div className="field" style={{ flex: 1 }}>
-                  <label>2nd</label>
+                <div className="field">
+                  <label>2nd reward</label>
                   <input type="number" min={0} value={r2} onChange={(e) => setR2(Number(e.target.value))} />
                 </div>
-                <div className="field" style={{ flex: 1 }}>
-                  <label>3rd</label>
+                <div className="field">
+                  <label>3rd reward</label>
                   <input type="number" min={0} value={r3} onChange={(e) => setR3(Number(e.target.value))} />
                 </div>
               </>
             )}
           </div>
-          <label className="muted">
-            <input type="checkbox" checked={requireTwitter} onChange={(e) => setRequireTwitter(e.target.checked)} />{' '}
-            Require Twitter
-          </label>
-          <br />
-          <label className="muted">
-            <input type="checkbox" checked={requireGithub} onChange={(e) => setRequireGithub(e.target.checked)} />{' '}
-            Require GitHub
-          </label>
-          <button className="btn block" style={{ marginTop: 12 }} type="submit" disabled={busy}>
-            {busy ? '…' : 'Lock reward & publish'}
-          </button>
+
+          <div className="create-checks">
+            <label className="check-pill">
+              <input type="checkbox" checked={requireTwitter} onChange={(e) => setRequireTwitter(e.target.checked)} />
+              Require Twitter
+            </label>
+            <label className="check-pill">
+              <input type="checkbox" checked={requireGithub} onChange={(e) => setRequireGithub(e.target.checked)} />
+              Require GitHub
+            </label>
+          </div>
+
+          <div className="create-foot">
+            <p className="muted">
+              Total lock:{' '}
+              <strong style={{ color: 'var(--primary)' }}>
+                {winnerMode === 'single' ? r1 : r1 + r2 + r3} {currency}
+              </strong>
+              {isDemo ? ' · demo escrow' : ''}
+            </p>
+            <button className="btn btn-primary" type="submit" disabled={busy}>
+              {busy ? 'Locking…' : 'Lock reward & publish'}
+            </button>
+          </div>
         </form>
       )}
 
-      <h2 style={{ fontSize: '1.05rem', marginTop: 20 }}>Your listings</h2>
-      {listings.map((l) => (
-        <div key={l.id} className="card">
-          <div className="row">
-            <span className={`badge ${l.type}`}>{l.type}</span>
-            <span className="badge">{l.status}</span>
-          </div>
-          <h3>{l.title}</h3>
-          <p className="muted">
-            {l.escrowAmount} {l.currency} · {l.escrowStatus}
-          </p>
-          <div className="row">
-            <Link className="btn secondary" to={`/listings/${l.id}`}>
-              View
-            </Link>
-            {(l.status === 'open' || l.status === 'closed') && l.escrowStatus === 'locked' && (
-              <button className="btn" type="button" onClick={() => openManage(l.id)}>
-                Manage / winners
-              </button>
-            )}
-          </div>
-        </div>
-      ))}
+      <div className="chip-row" style={{ marginTop: 8 }}>
+        {(['all', 'open', 'paid', 'pending_lock'] as const).map((f) => (
+          <button
+            key={f}
+            type="button"
+            className={`float-chip ${filter === f ? 'active' : ''}`}
+            onClick={() => setFilter(f)}
+          >
+            {f === 'all' ? 'All' : f.replace('_', ' ')}
+          </button>
+        ))}
+      </div>
 
-      {manageId && (
-        <div className="card">
-          <h3>Pick winners</h3>
-          {subs.length === 0 && <p className="muted">No submissions yet.</p>}
-          {subs.map((s) => (
-            <div key={s.id} style={{ borderTop: '1px solid var(--border)', padding: '10px 0' }}>
-              <strong>{s.user?.displayName || s.userId}</strong>
-              <div className="muted">
-                <a href={s.workUrl} target="_blank" rel="noreferrer">
-                  {s.workUrl}
-                </a>
-              </div>
-              <p className="locked">
-                🐦 {s.twitterUsername || '—'} · 🐙 {s.githubUsername || '—'}
-              </p>
-              <select
-                value={ranks[s.id] ?? 0}
-                onChange={(e) =>
-                  setRanks((prev) => ({ ...prev, [s.id]: Number(e.target.value) as 0 | 1 | 2 | 3 }))
-                }
-              >
-                <option value={0}>—</option>
-                <option value={1}>1st</option>
-                <option value={2}>2nd</option>
-                <option value={3}>3rd</option>
-              </select>
+      <div className="sponsor-list">
+        {visible.length === 0 && <div className="empty-state">No listings in this filter.</div>}
+        {visible.map((l) => (
+          <article key={l.id} className="task-card sponsor-card">
+            <div className={`task-art task-art--${l.type}`}>
+              <span className="task-art__glyph">{l.type[0].toUpperCase()}</span>
+              <div className="task-art__hex" />
             </div>
-          ))}
-          <div className="row" style={{ marginTop: 12 }}>
-            <button className="btn secondary" type="button" onClick={() => setManageId(null)}>
-              Cancel
-            </button>
-            <button className="btn" type="button" disabled={busy} onClick={confirmWinners}>
-              Confirm winners & release
-            </button>
+            <div className="task-body">
+              <div className="task-top">
+                <span className={`type-pill type-pill--${l.type}`}>{l.type}</span>
+                <span className="type-pill type-pill--muted">{l.status}</span>
+                <span className="type-pill">{l.escrowStatus}</span>
+              </div>
+              <h3 className="task-title">{l.title}</h3>
+              <div className="task-meta">
+                <span>
+                  {l.escrowAmount} {l.currency}
+                </span>
+                <span>{l.winnerMode === 'top3' ? 'Top 3' : 'Single'}</span>
+                <span>Ends {new Date(l.deadlineAt).toLocaleDateString()}</span>
+              </div>
+              <div className="row">
+                <Link className="btn btn-ghost btn-sm" to={`/listings/${l.id}`}>
+                  View public
+                </Link>
+                {(l.status === 'open' || l.status === 'closed') && l.escrowStatus === 'locked' && (
+                  <button className="btn btn-primary btn-sm" type="button" onClick={() => openManage(l.id)}>
+                    Manage winners
+                  </button>
+                )}
+              </div>
+            </div>
+          </article>
+        ))}
+      </div>
+
+      {manageId && manageListing && (
+        <div className="manage-overlay" role="dialog" aria-modal="true">
+          <div className="manage-modal glass-card">
+            <div className="create-panel__head">
+              <div>
+                <p className="section-label">Review</p>
+                <h2 className="page-title" style={{ margin: 0, fontSize: '1.25rem' }}>
+                  {manageListing.title}
+                </h2>
+              </div>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setManageId(null)}>
+                Close
+              </button>
+            </div>
+            <p className="muted">
+              Assign ranks then release escrow. Each winner receives +1 credit.
+            </p>
+            {subs.length === 0 && <div className="empty-state">No submissions yet.</div>}
+            <div className="manage-subs">
+              {subs.map((s) => (
+                <div key={s.id} className="manage-sub">
+                  <div className="msg-thread__avatar">{(s.user?.displayName || '?').slice(0, 1)}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <strong>{s.user?.displayName || s.userId}</strong>
+                    <div className="muted truncate">
+                      <a href={s.workUrl} target="_blank" rel="noreferrer">
+                        {s.workUrl}
+                      </a>
+                    </div>
+                    <p className="locked" style={{ margin: '4px 0 0' }}>
+                      🐦 {s.twitterUsername || '—'} · 🐙 {s.githubUsername || '—'}
+                    </p>
+                  </div>
+                  <select
+                    className="rank-select"
+                    value={ranks[s.id] ?? 0}
+                    onChange={(e) =>
+                      setRanks((prev) => ({ ...prev, [s.id]: Number(e.target.value) as 0 | 1 | 2 | 3 }))
+                    }
+                  >
+                    <option value={0}>—</option>
+                    <option value={1}>1st</option>
+                    <option value={2}>2nd</option>
+                    <option value={3}>3rd</option>
+                  </select>
+                </div>
+              ))}
+            </div>
+            <div className="create-foot">
+              <p className="muted">Releases funds to winner wallets</p>
+              <button className="btn btn-primary" type="button" disabled={busy} onClick={confirmWinners}>
+                {busy ? 'Releasing…' : 'Confirm winners & release'}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -12,6 +12,7 @@ import { MyWork } from './pages/MyWork'
 import { Credits } from './pages/Credits'
 import { Profile } from './pages/Profile'
 import { Sponsor } from './pages/Sponsor'
+import { Messages } from './pages/Messages'
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
               <Route path="board" element={<Board />} />
               <Route path="listings/:id" element={<ListingDetail />} />
               <Route path="my-work" element={<MyWork />} />
+              <Route path="messages" element={<Messages />} />
               <Route path="credits" element={<Credits />} />
               <Route path="profile" element={<Profile />} />
               <Route path="sponsor" element={<Sponsor />} />
