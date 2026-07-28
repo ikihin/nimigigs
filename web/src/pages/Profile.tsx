@@ -43,7 +43,7 @@ export function Profile() {
       {error && <div className="alert error">{error}</div>}
       {isDemo && <div className="alert info">Demo wallet mode (outside Nimiq Pay).</div>}
 
-      <div className="card">
+      <div className="glass-card" style={{ marginBottom: 14 }}>
         <p>
           <strong>{user.displayName}</strong>
         </p>
@@ -54,7 +54,7 @@ export function Profile() {
         </p>
         <p className="muted">Referral: {user.referralCode}</p>
         <button
-          className="btn secondary"
+          className="btn btn-secondary"
           type="button"
           onClick={() =>
             bindWalletToAccount()
@@ -66,7 +66,7 @@ export function Profile() {
         </button>
       </div>
 
-      <form className="card" onSubmit={saveSocial}>
+      <form className="glass-card" onSubmit={saveSocial}>
         <h3>Connect social (stub)</h3>
         <div className="field">
           <label>Twitter handle</label>
@@ -76,7 +76,7 @@ export function Profile() {
           <label>GitHub username</label>
           <input value={github} onChange={(e) => setGithub(e.target.value)} placeholder="you" />
         </div>
-        <button className="btn" type="submit">
+        <button className="btn btn-primary" type="submit">
           Save
         </button>
       </form>

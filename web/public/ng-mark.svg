@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" fill="none">
+  <!-- Geometric NG monogram — sharp crypto mark -->
+  <path
+    fill="#FFC400"
+    d="M18 58V22l16 18.5V22h12v36H34L18 39.5V58H18z"
+  />
+  <path
+    fill="#FFC400"
+    d="M42 22h8c11 0 18 7.2 18 18s-7 18-18 18h-10v-9h10c5.8 0 9.5-3.6 9.5-9s-3.7-9-9.5-9h-8V22z"
+  />
+  <path
+    fill="#FFC400"
+    d="M10 24.5 22 12l3.5 3.5-12 12.5L10 24.5zm0 31L22 68l3.5-3.5-12-12.5L10 55.5z"
+  />
+</svg>

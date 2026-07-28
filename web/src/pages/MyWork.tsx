@@ -25,7 +25,7 @@ export function MyWork() {
       {error && <div className="alert error">{error}</div>}
       {subs.length === 0 && <p className="muted">No submissions yet.</p>}
       {subs.map((s) => (
-        <div key={s.id} className="card">
+        <div key={s.id} className="glass-card" style={{ marginBottom: 12 }}>
           <h3>{s.listing?.title || s.listingId}</h3>
           <div className="meta">
             <span>Status: {s.status}</span>

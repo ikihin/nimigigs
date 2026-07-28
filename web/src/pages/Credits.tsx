@@ -19,17 +19,18 @@ export function Credits() {
   return (
     <div>
       <h1 className="page-title">Credits</h1>
-      <div className="card">
-        <h3>
-          Balance ⚡ {data?.balance ?? user.creditsBalance}
-        </h3>
-        <p className="muted" style={{ margin: 0 }}>
-          Monthly grant: 4 · resets each calendar month UTC · leftover does not stack
+      <div className="glass-card credit-card" style={{ marginBottom: 14, maxWidth: 420 }}>
+        <div className="credit-card__head">
+          <span>Balance</span>
+          <span className="bolt-glow">⚡</span>
+        </div>
+        <div className="credit-card__num">{data?.balance ?? user.creditsBalance}</div>
+        <p className="credit-card__sub">
+          Monthly grant 4 · resets 1st UTC · leftover does not stack · {data?.month ?? user.creditsMonth}
         </p>
-        <p className="muted">Month key: {data?.month ?? user.creditsMonth}</p>
       </div>
 
-      <div className="card">
+      <div className="glass-card" style={{ marginBottom: 14 }}>
         <h3>Referral</h3>
         {ref && (
           <>
@@ -45,7 +46,7 @@ export function Credits() {
         )}
       </div>
 
-      <div className="card">
+      <div className="glass-card">
         <h3>Rules</h3>
         <ul className="muted" style={{ margin: 0 }}>
           <li>1 submit = 1 credit</li>

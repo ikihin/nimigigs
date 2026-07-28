@@ -65,7 +65,7 @@ export function ListingDetail() {
         <span>Deadline: {new Date(listing.deadlineAt).toLocaleString()}</span>
         <span>{listing.submitCount ?? 0} submissions</span>
       </div>
-      <div className="card">
+      <div className="glass-card" style={{ marginBottom: 14 }}>
         <h3>Rewards</h3>
         <ul className="muted" style={{ margin: 0 }}>
           {listing.rewards.map((r) => (
@@ -75,7 +75,7 @@ export function ListingDetail() {
           ))}
         </ul>
       </div>
-      <div className="card">
+      <div className="glass-card" style={{ marginBottom: 14 }}>
         <h3>Description</h3>
         <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{listing.description}</p>
         <p className="muted" style={{ marginTop: 10 }}>
@@ -98,11 +98,11 @@ export function ListingDetail() {
       ) : (
         <>
           {!showSubmit ? (
-            <button className="btn block" type="button" onClick={() => setShowSubmit(true)}>
+            <button className="btn btn-primary btn-block" type="button" onClick={() => setShowSubmit(true)}>
               Submit work · costs 1 credit (you have {user.creditsBalance})
             </button>
           ) : (
-            <form className="card" onSubmit={onSubmit}>
+            <form className="glass-card" onSubmit={onSubmit}>
               <div className="field">
                 <label>Work link *</label>
                 <input
@@ -120,10 +120,10 @@ export function ListingDetail() {
               <p className="locked">Wallet: {user.nimiqAddress || 'not set'}</p>
               <p className="locked">Twitter: {user.twitter || '—'} · GitHub: {user.github || '—'}</p>
               <div className="row">
-                <button className="btn secondary" type="button" onClick={() => setShowSubmit(false)}>
+                <button className="btn btn-ghost" type="button" onClick={() => setShowSubmit(false)}>
                   Cancel
                 </button>
-                <button className="btn" type="submit" disabled={busy}>
+                <button className="btn btn-primary" type="submit" disabled={busy}>
                   {busy ? '…' : 'Submit · −1 credit'}
                 </button>
               </div>

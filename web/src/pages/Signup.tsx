@@ -29,10 +29,18 @@ export function Signup() {
   }
 
   return (
-    <div>
-      <h1 className="page-title">Create account</h1>
+    <div className="auth-shell">
+      <div className="auth-brand">
+        <div className="mark">
+          <img src="/ng-mark.svg" alt="" />
+        </div>
+        <img src="/logo-nimigigs.svg" alt="NimGigs" className="word" />
+        <p className="muted" style={{ margin: 0 }}>
+          Join the marketplace
+        </p>
+      </div>
       {error && <div className="alert error">{error}</div>}
-      <form className="card" onSubmit={onSubmit}>
+      <form className="glass-card" onSubmit={onSubmit}>
         <div className="field">
           <label htmlFor="email">Email</label>
           <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
@@ -57,11 +65,11 @@ export function Signup() {
             placeholder="GIGS-XXXX"
           />
         </div>
-        <button className="btn block" type="submit" disabled={busy}>
+        <button className="btn btn-primary btn-block" type="submit" disabled={busy}>
           {busy ? '…' : 'Create account'}
         </button>
       </form>
-      <p className="muted">
+      <p className="muted" style={{ textAlign: 'center', marginTop: 16 }}>
         Already have an account? <Link to="/login">Log in</Link>
       </p>
     </div>

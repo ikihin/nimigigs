@@ -62,16 +62,16 @@ export function Onboarding() {
         </div>
       )}
 
-      <div className="card">
+      <div className="glass-card" style={{ marginBottom: 14 }}>
         <h3>1. Connect Nimiq wallet</h3>
         <p className="muted">Required for payouts and posting bounties.</p>
         <p className="locked">{user.nimiqAddress || displayAddress || 'Not connected'}</p>
-        <button className="btn" type="button" disabled={busy || Boolean(user.nimiqAddress)} onClick={connectWallet}>
+        <button className="btn btn-primary" type="button" disabled={busy || Boolean(user.nimiqAddress)} onClick={connectWallet}>
           {user.nimiqAddress ? 'Wallet linked ✓' : 'Connect / bind wallet'}
         </button>
       </div>
 
-      <div className="card">
+      <div className="glass-card">
         <h3>2. Link social (recommended)</h3>
         <p className="muted">Scaffold uses handle connect — swap for real OAuth later.</p>
         <div className="field">
@@ -93,10 +93,10 @@ export function Onboarding() {
           />
         </div>
         <div className="row">
-          <button className="btn secondary" type="button" disabled={busy} onClick={connectSocial}>
+          <button className="btn btn-ghost" type="button" disabled={busy} onClick={connectSocial}>
             Save social
           </button>
-          <button className="btn" type="button" onClick={() => nav('/board')}>
+          <button className="btn btn-primary" type="button" onClick={() => nav('/board')}>
             Go to board
           </button>
         </div>
