@@ -14,7 +14,7 @@ export function Layout() {
     <div className="app-shell">
       <header className="topbar">
         <NavLink to={user ? '/board' : '/'} className="logo" aria-label="NimGigs">
-          <img src="/ng-mark.svg" alt="NimGigs" className="logo-only" />
+          <img src="/logo-nimigigs.svg" alt="NimGigs" className="logo-word" />
         </NavLink>
 
         {user && (

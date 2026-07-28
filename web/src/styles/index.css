@@ -129,19 +129,29 @@ textarea {
   line-height: 0;
 }
 
-/* Mark-only brand (NG monogram) */
+/* Full wordmark in topbar (Desain tanpa judul-6) */
+.logo-word {
+  height: 40px;
+  width: auto;
+  max-width: min(200px, 42vw);
+  object-fit: contain;
+  object-position: left center;
+  filter: drop-shadow(0 0 12px rgba(255, 196, 0, 0.28));
+  transition: filter 0.2s, transform 0.2s;
+}
+
+.logo:hover .logo-word {
+  filter: drop-shadow(0 0 18px rgba(255, 196, 0, 0.5));
+  transform: scale(1.02);
+}
+
+/* Mark-only (NG monogram) — hero / favicon contexts */
 .logo-only {
   height: 42px;
   width: auto;
   max-width: 56px;
   object-fit: contain;
   filter: drop-shadow(0 0 12px rgba(255, 196, 0, 0.35));
-  transition: filter 0.2s, transform 0.2s;
-}
-
-.logo:hover .logo-only {
-  filter: drop-shadow(0 0 18px rgba(255, 196, 0, 0.55));
-  transform: scale(1.04);
 }
 
 .auth-logo-only {
@@ -1267,8 +1277,9 @@ textarea {
     padding: 6px 8px;
     font-size: 0.72rem;
   }
-  .logo-only {
-    height: 36px;
+  .logo-word {
+    height: 32px;
+    max-width: 140px;
   }
 }
 
