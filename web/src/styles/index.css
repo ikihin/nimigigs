@@ -105,8 +105,9 @@ textarea {
   display: flex;
   align-items: center;
   gap: 18px;
-  padding: 14px 0;
+  padding: 16px 0;
   margin-bottom: 8px;
+  min-height: 72px;
   backdrop-filter: blur(18px) saturate(1.2);
   background: linear-gradient(to bottom, rgba(7, 7, 7, 0.92), rgba(7, 7, 7, 0.72));
   border-bottom: 1px solid transparent;
@@ -131,9 +132,9 @@ textarea {
 
 /* Full wordmark in topbar (Desain tanpa judul-6) */
 .logo-word {
-  height: 40px;
+  height: 56px;
   width: auto;
-  max-width: min(200px, 42vw);
+  max-width: min(280px, 52vw);
   object-fit: contain;
   object-position: left center;
   filter: drop-shadow(0 0 12px rgba(255, 196, 0, 0.28));
@@ -1278,8 +1279,8 @@ textarea {
     font-size: 0.72rem;
   }
   .logo-word {
-    height: 32px;
-    max-width: 140px;
+    height: 44px;
+    max-width: 200px;
   }
 }
 
