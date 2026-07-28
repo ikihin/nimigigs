@@ -1,0 +1,21 @@
+{
+  "name": "nimigigs",
+  "private": true,
+  "version": "0.1.0",
+  "description": "NimGigs — bounty / quest / job board Mini App for Nimiq Pay",
+  "license": "MIT",
+  "workspaces": [
+    "web",
+    "server"
+  ],
+  "scripts": {
+    "dev": "concurrently -n web,api -c cyan,magenta \"npm run dev -w web\" \"npm run dev -w server\"",
+    "dev:web": "npm run dev -w web",
+    "dev:server": "npm run dev -w server",
+    "build": "npm run build -w web && npm run build -w server",
+    "start": "npm run start -w server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
