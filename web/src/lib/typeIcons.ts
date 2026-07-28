@@ -4,7 +4,7 @@ import type { ListingType } from './types'
 export const TYPE_ICONS: Partial<Record<ListingType, string>> = {
   bounty: '/icon-bounty.svg',
   quest: '/icon-quest.svg',
-  // job: add when asset is ready
+  job: '/icon-job.svg',
 }
 
 export function typeIconSrc(type: string): string | null {
