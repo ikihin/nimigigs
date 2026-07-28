@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useWallet } from '../context/WalletContext'
@@ -7,13 +7,20 @@ import { HUB_ENDPOINT } from '../lib/hub'
 import { isInsideNimiqPay } from '../lib/nimiq'
 
 export function Onboarding() {
-  const { user, token, setUser } = useAuth()
+  const { user, token, refreshUser } = useAuth()
   const { displayAddress, connectWallet, isDemo, status } = useWallet()
   const nav = useNavigate()
   const [error, setError] = useState<string | null>(null)
-  const [twitter, setTwitter] = useState('')
-  const [github, setGithub] = useState('')
   const [busy, setBusy] = useState(false)
+  const [oauth, setOauth] = useState<{ github: boolean; twitter: boolean } | null>(null)
+
+  useEffect(() => {
+    void api
+      .oauthStatus()
+      .then((s) => setOauth({ github: s.github, twitter: s.twitter }))
+      .catch(() => null)
+    void refreshUser()
+  }, [refreshUser])
 
   if (!user || !token) return <Navigate to="/login" replace />
 
@@ -29,22 +36,15 @@ export function Onboarding() {
     }
   }
 
-  async function connectSocial() {
+  async function startOAuth(provider: 'twitter' | 'github') {
     if (!token) return
     setBusy(true)
     setError(null)
     try {
-      if (twitter.trim()) {
-        const { user: u } = await api.connectOAuth(token, 'twitter', twitter)
-        setUser(u)
-      }
-      if (github.trim()) {
-        const { user: u } = await api.connectOAuth(token, 'github', github)
-        setUser(u)
-      }
+      const { url } = await api.oauthStart(token, provider)
+      window.location.href = url
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Connect failed')
-    } finally {
+      setError(e instanceof Error ? e.message : 'OAuth start failed')
       setBusy(false)
     }
   }
@@ -60,22 +60,16 @@ export function Onboarding() {
       <div className="glass-card" style={{ marginBottom: 14 }}>
         <h3>1. Connect Nimiq wallet</h3>
         <p className="muted">
-          Prove ownership by signing a message. Inside Nimiq Pay we use the Mini App provider; in a
-          browser we open{' '}
+          Sign a message via Nimiq Pay or{' '}
           <a href={HUB_ENDPOINT} target="_blank" rel="noreferrer">
             hub.nimiq.com
-          </a>{' '}
-          (sign-message).
+          </a>
+          .
         </p>
         {isDemo && !isInsideNimiqPay() && (
-          <div className="alert info">
-            Browser mode — Hub popup will open for sign-message. Allow popups for this site.
-          </div>
+          <div className="alert info">Browser mode — allow Hub popups.</div>
         )}
         <p className="locked">{user.nimiqAddress || displayAddress || 'Not connected'}</p>
-        {user.walletMethod && (
-          <p className="muted">Linked via: {user.walletMethod}</p>
-        )}
         <button
           className="btn btn-primary"
           type="button"
@@ -91,30 +85,45 @@ export function Onboarding() {
       </div>
 
       <div className="glass-card">
-        <h3>2. Link social (recommended)</h3>
-        <p className="muted">Used to verify submissions on bounties that require Twitter / GitHub.</p>
-        <div className="field">
-          <label>Twitter</label>
-          <input
-            placeholder={user.twitter || '@handle'}
-            value={twitter}
-            onChange={(e) => setTwitter(e.target.value)}
-            disabled={Boolean(user.twitter)}
-          />
+        <h3>2. Link social (OAuth)</h3>
+        <p className="muted">Required for bounties that ask for Twitter or GitHub verification.</p>
+
+        <div className="social-row">
+          <div className="social-card">
+            <div>
+              <strong>X / Twitter</strong>
+              <p className="muted" style={{ margin: '4px 0 0' }}>
+                {user.twitter ? `@${user.twitter}` : 'Not connected'}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              disabled={busy || (oauth !== null && !oauth.twitter)}
+              onClick={() => startOAuth('twitter')}
+            >
+              {user.twitter ? 'Reconnect X' : 'Connect X'}
+            </button>
+          </div>
+          <div className="social-card">
+            <div>
+              <strong>GitHub</strong>
+              <p className="muted" style={{ margin: '4px 0 0' }}>
+                {user.github ? `@${user.github}` : 'Not connected'}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              disabled={busy || (oauth !== null && !oauth.github)}
+              onClick={() => startOAuth('github')}
+            >
+              {user.github ? 'Reconnect GitHub' : 'Connect GitHub'}
+            </button>
+          </div>
         </div>
-        <div className="field">
-          <label>GitHub</label>
-          <input
-            placeholder={user.github || 'username'}
-            value={github}
-            onChange={(e) => setGithub(e.target.value)}
-            disabled={Boolean(user.github)}
-          />
-        </div>
-        <div className="row">
-          <button className="btn btn-ghost" type="button" disabled={busy} onClick={connectSocial}>
-            Save social
-          </button>
+
+        <div className="row" style={{ marginTop: 16 }}>
           <button className="btn btn-primary" type="button" onClick={() => nav('/board')}>
             Go to board
           </button>

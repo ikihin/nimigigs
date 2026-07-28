@@ -52,6 +52,26 @@ npm run dev:web
 npm run dev:server
 ```
 
+## OAuth (Twitter / GitHub)
+
+Copy `.env.example` → `server/.env` (or export env vars), then restart the API.
+
+### GitHub
+
+1. [New OAuth App](https://github.com/settings/developers)
+2. Homepage: `http://localhost:5173`
+3. Callback: `http://localhost:8787/api/v1/oauth/github/callback`
+4. Set `GITHUB_CLIENT_ID` + `GITHUB_CLIENT_SECRET`
+
+### X / Twitter
+
+1. [Developer Portal](https://developer.x.com/en/portal/dashboard) → OAuth 2.0 app
+2. Callback: `http://localhost:8787/api/v1/oauth/twitter/callback`
+3. Scopes: `tweet.read` `users.read` `offline.access`
+4. Set `TWITTER_CLIENT_ID` + `TWITTER_CLIENT_SECRET`
+
+Without keys, Profile still allows **stub** handle linking when `OAUTH_ALLOW_STUB=true`.
+
 ## License
 
 MIT

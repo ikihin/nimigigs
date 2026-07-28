@@ -142,11 +142,29 @@ export const api = {
       token,
     })
   },
+  oauthStatus() {
+    return request<{ github: boolean; twitter: boolean; allowStub: boolean }>('/oauth/status')
+  },
+  /** Returns provider authorize URL (open in same window). */
+  oauthStart(token: string, provider: 'twitter' | 'github') {
+    return request<{ url: string; provider: string }>(`/oauth/${provider}/start`, { token })
+  },
+  /** Full-page redirect start (includes token in query for cookie-less flow). */
+  oauthStartRedirectUrl(token: string, provider: 'twitter' | 'github') {
+    const base = import.meta.env.VITE_API_URL || '/api/v1'
+    return `${base}/oauth/${provider}/start?token=${encodeURIComponent(token)}&redirect=1`
+  },
   connectOAuth(token: string, provider: 'twitter' | 'github', username: string) {
-    return request<{ user: PublicUser }>(`/oauth/${provider}/connect`, {
+    return request<{ user: PublicUser; stub?: boolean }>(`/oauth/${provider}/connect`, {
       method: 'POST',
       token,
       body: JSON.stringify({ username }),
+    })
+  },
+  disconnectOAuth(token: string, provider: 'twitter' | 'github') {
+    return request<{ user: PublicUser }>(`/oauth/${provider}`, {
+      method: 'DELETE',
+      token,
     })
   },
 }

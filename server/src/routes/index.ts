@@ -26,6 +26,19 @@ import {
   userHasSubmitted,
 } from '../services/listings.js'
 import { store } from '../db/store.js'
+import { config } from '../config.js'
+import {
+  createOAuthState,
+  createPkce,
+  exchangeGithubCode,
+  exchangeTwitterCode,
+  githubAuthUrl,
+  linkOAuthAccount,
+  oauthFrontendRedirect,
+  resolveUserFromOAuthStart,
+  takeOAuthState,
+  twitterAuthUrl,
+} from '../services/oauth.js'
 
 export const api = new Hono<AppEnv>()
 
@@ -168,16 +181,141 @@ api.get('/me/payouts', requireAuth, (c) => {
   return c.json({ payouts })
 })
 
-// ── OAuth stubs (real OAuth later) ────────────────────
+// ── OAuth (GitHub + Twitter/X) ────────────────────────
+api.get('/oauth/status', (c) => {
+  return c.json({
+    github: config.github.enabled(),
+    twitter: config.twitter.enabled(),
+    allowStub: config.oauthAllowStub,
+  })
+})
+
+/** Start OAuth — pass Bearer token or ?token=JWT (for full-page redirect) */
+api.get('/oauth/:provider/start', async (c) => {
+  const provider = c.req.param('provider')
+  if (provider !== 'twitter' && provider !== 'github') {
+    return err(c, 'INVALID_PROVIDER', 'Use twitter or github', 400)
+  }
+  const user = resolveUserFromOAuthStart(
+    c.req.header('authorization'),
+    c.req.query('token'),
+  )
+  if (!user) return err(c, 'UNAUTHORIZED', 'Login required', 401)
+
+  if (provider === 'github') {
+    if (!config.github.enabled()) {
+      return err(
+        c,
+        'OAUTH_NOT_CONFIGURED',
+        'Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET on the server',
+        503,
+      )
+    }
+    const { codeVerifier, codeChallenge } = createPkce()
+    const state = createOAuthState(user.id, 'github', codeVerifier)
+    // codeChallenge unused for GitHub (no PKCE required) but state stores verifier anyway
+    void codeChallenge
+    const url = githubAuthUrl(state)
+    if (c.req.query('redirect') === '1') return c.redirect(url)
+    return c.json({ url, provider: 'github' })
+  }
+
+  // twitter / X OAuth 2.0 + PKCE
+  if (!config.twitter.enabled()) {
+    return err(
+      c,
+      'OAUTH_NOT_CONFIGURED',
+      'Set TWITTER_CLIENT_ID and TWITTER_CLIENT_SECRET on the server',
+      503,
+    )
+  }
+  const { codeVerifier, codeChallenge } = createPkce()
+  const state = createOAuthState(user.id, 'twitter', codeVerifier)
+  const url = twitterAuthUrl(state, codeChallenge)
+  if (c.req.query('redirect') === '1') return c.redirect(url)
+  return c.json({ url, provider: 'twitter' })
+})
+
+api.get('/oauth/github/callback', async (c) => {
+  const code = c.req.query('code')
+  const state = c.req.query('state')
+  const oauthError = c.req.query('error')
+  if (oauthError) {
+    return c.redirect(oauthFrontendRedirect({ ok: false, provider: 'github', error: oauthError }))
+  }
+  if (!code || !state) {
+    return c.redirect(
+      oauthFrontendRedirect({ ok: false, provider: 'github', error: 'missing_code' }),
+    )
+  }
+  const st = takeOAuthState(state)
+  if (!st || st.provider !== 'github') {
+    return c.redirect(
+      oauthFrontendRedirect({ ok: false, provider: 'github', error: 'invalid_state' }),
+    )
+  }
+  try {
+    const profile = await exchangeGithubCode(code)
+    linkOAuthAccount(st.userId, 'github', profile.username, profile.providerUserId)
+    return c.redirect(
+      oauthFrontendRedirect({ ok: true, provider: 'github', username: profile.username }),
+    )
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'github_failed'
+    return c.redirect(oauthFrontendRedirect({ ok: false, provider: 'github', error: message }))
+  }
+})
+
+api.get('/oauth/twitter/callback', async (c) => {
+  const code = c.req.query('code')
+  const state = c.req.query('state')
+  const oauthError = c.req.query('error')
+  if (oauthError) {
+    return c.redirect(oauthFrontendRedirect({ ok: false, provider: 'twitter', error: oauthError }))
+  }
+  if (!code || !state) {
+    return c.redirect(
+      oauthFrontendRedirect({ ok: false, provider: 'twitter', error: 'missing_code' }),
+    )
+  }
+  const st = takeOAuthState(state)
+  if (!st || st.provider !== 'twitter') {
+    return c.redirect(
+      oauthFrontendRedirect({ ok: false, provider: 'twitter', error: 'invalid_state' }),
+    )
+  }
+  try {
+    const profile = await exchangeTwitterCode(code, st.codeVerifier)
+    linkOAuthAccount(st.userId, 'twitter', profile.username, profile.providerUserId)
+    return c.redirect(
+      oauthFrontendRedirect({ ok: true, provider: 'twitter', username: profile.username }),
+    )
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'twitter_failed'
+    return c.redirect(oauthFrontendRedirect({ ok: false, provider: 'twitter', error: message }))
+  }
+})
+
+/** Fallback: paste handle (only if OAUTH_ALLOW_STUB=true or OAuth not configured) */
 api.post('/oauth/:provider/connect', requireAuth, async (c) => {
   const provider = c.req.param('provider')
   if (provider !== 'twitter' && provider !== 'github') {
     return err(c, 'INVALID_PROVIDER', 'Use twitter or github', 400)
   }
+  const configured =
+    provider === 'github' ? config.github.enabled() : config.twitter.enabled()
+  if (configured && !config.oauthAllowStub) {
+    return err(
+      c,
+      'USE_OAUTH_FLOW',
+      `Use GET /oauth/${provider}/start for real OAuth`,
+      400,
+    )
+  }
   const body = await c.req.json<{ username: string }>()
   if (!body.username?.trim()) return err(c, 'INVALID_INPUT', 'username required', 400)
   const account = connectOAuth(c.get('user'), provider, body.username)
-  return c.json({ account, user: toPublicUser(c.get('user')) })
+  return c.json({ account, user: toPublicUser(c.get('user')), stub: true })
 })
 
 api.delete('/oauth/:provider', requireAuth, async (c) => {
