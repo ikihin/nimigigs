@@ -676,10 +676,10 @@ textarea {
 
 .task-card {
   display: grid;
-  grid-template-columns: 88px 1fr auto;
-  gap: 16px;
+  grid-template-columns: 128px 1fr auto;
+  gap: 18px;
   align-items: center;
-  padding: 16px;
+  padding: 18px;
   border-radius: var(--radius);
   background: linear-gradient(160deg, rgba(22, 22, 22, 0.95), rgba(12, 12, 12, 0.98));
   border: 1px solid var(--border);
@@ -710,15 +710,16 @@ textarea {
 }
 
 .task-art {
-  width: 88px;
-  height: 88px;
-  border-radius: 18px;
+  width: 128px;
+  height: 128px;
+  border-radius: 22px;
   display: grid;
   place-items: center;
   position: relative;
   background: #0a0a0a;
   border: 1px solid var(--border);
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .task-art--bounty {
@@ -749,25 +750,25 @@ textarea {
 }
 
 .task-art--icon {
-  background: radial-gradient(circle at 35% 30%, rgba(255, 196, 0, 0.14), #0a0a0a 72%);
-  padding: 10px;
+  background: radial-gradient(circle at 35% 30%, rgba(255, 196, 0, 0.16), #0a0a0a 72%);
+  padding: 8px;
 }
 
 .task-art__icon {
-  width: 72%;
-  height: 72%;
+  width: 92%;
+  height: 92%;
   object-fit: contain;
-  filter: drop-shadow(0 0 12px rgba(255, 196, 0, 0.35));
+  filter: drop-shadow(0 0 16px rgba(255, 196, 0, 0.45));
   z-index: 1;
 }
 
-/* Small bounty mark in type pills (optional helper class) */
+/* Bounty mark in type pills */
 .type-icon-inline {
-  width: 14px;
-  height: 14px;
+  width: 20px;
+  height: 20px;
   object-fit: contain;
-  vertical-align: -2px;
-  margin-right: 4px;
+  vertical-align: -4px;
+  margin-right: 5px;
 }
 
 .task-body {
@@ -1262,11 +1263,16 @@ textarea {
     display: none;
   }
   .task-card {
-    grid-template-columns: 64px 1fr;
+    grid-template-columns: 96px 1fr;
   }
   .task-art {
-    width: 64px;
-    height: 64px;
+    width: 96px;
+    height: 96px;
+    border-radius: 18px;
+  }
+  .task-art__icon {
+    width: 94%;
+    height: 94%;
   }
   .task-cta {
     display: none;
