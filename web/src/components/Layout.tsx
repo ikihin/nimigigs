@@ -7,8 +7,8 @@ export function Layout() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <NavLink to="/" className="logo">
-          Nim<span>Gigs</span>
+        <NavLink to="/" className="logo" aria-label="NimGigs home">
+          <img src="/logo-nimigigs.svg" alt="NimGigs" className="logo-img" />
         </NavLink>
         <div className="topbar-spacer" />
         {user && (

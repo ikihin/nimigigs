@@ -9,6 +9,7 @@ export function Landing() {
 
   return (
     <div className="hero">
+      <img src="/logo-nimigigs.svg" alt="NimGigs" className="hero-logo" />
       <h1>Ship work. Get paid on Nimiq.</h1>
       <p className="muted">
         Bounties, quests, and jobs with locked rewards in USDT &amp; NIM. Submit with credits —

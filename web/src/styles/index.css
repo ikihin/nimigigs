@@ -70,13 +70,25 @@ textarea {
 }
 
 .logo {
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  font-size: 1.15rem;
+  display: inline-flex;
+  align-items: center;
+  line-height: 0;
 }
 
-.logo span {
-  color: var(--accent);
+.logo-img {
+  height: 36px;
+  width: auto;
+  max-width: 160px;
+  object-fit: contain;
+  display: block;
+}
+
+.hero-logo {
+  display: block;
+  width: min(100%, 320px);
+  height: auto;
+  margin: 0 auto 18px;
+  object-fit: contain;
 }
 
 .topbar-spacer {
@@ -288,12 +300,21 @@ textarea {
 
 .hero {
   padding: 28px 0 10px;
+  text-align: center;
 }
 
 .hero h1 {
   margin: 0 0 8px;
   font-size: 1.75rem;
   letter-spacing: -0.03em;
+}
+
+.hero .row {
+  justify-content: center;
+}
+
+.hero .card {
+  text-align: left;
 }
 
 .stack {
