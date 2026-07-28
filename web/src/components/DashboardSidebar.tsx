@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { IconBolt, IconTrophy, IconUsers } from './Icons'
 
-const TRENDING = ['design', 'content', 'dev', 'ai', 'marketing', 'quest']
+const TRENDING = ['bounty', 'quest', 'job']
 const LEADERS = [
   { name: 'Aya.nim', earn: '420 USDT' },
   { name: 'hexforge', earn: '310 USDT' },

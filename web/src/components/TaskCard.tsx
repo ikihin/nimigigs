@@ -3,16 +3,6 @@ import type { Listing } from '../lib/types'
 import { typeIconSrc } from '../lib/typeIcons'
 import { IconArrow, IconClock, IconUsers } from './Icons'
 
-const art: Record<string, string> = {
-  bounty: 'B',
-  quest: 'Q',
-  job: 'J',
-  design: '◇',
-  content: '✎',
-  dev: '</>',
-  other: '⬡',
-}
-
 function daysLeft(deadline: string) {
   const ms = new Date(deadline).getTime() - Date.now()
   if (ms <= 0) return 'Ended'
@@ -29,9 +19,9 @@ function difficultyFrom(listing: Listing) {
 
 export function TaskCard({ listing }: { listing: Listing }) {
   const icon = typeIconSrc(listing.type)
-  const mark = art[listing.category] || art[listing.type] || art.other
   const winners = listing.winnerMode === 'top3' ? 3 : 1
   const currency = listing.currency === 'BOTH' ? 'MIX' : listing.currency
+  const label = listing.type.charAt(0).toUpperCase() + listing.type.slice(1)
 
   return (
     <Link to={`/listings/${listing.id}`} className="task-card">
@@ -39,10 +29,7 @@ export function TaskCard({ listing }: { listing: Listing }) {
         {icon ? (
           <img src={icon} alt="" className="task-art__icon" />
         ) : (
-          <>
-            <span className="task-art__glyph">{mark}</span>
-            <div className="task-art__hex" />
-          </>
+          <span className="task-art__glyph">{label[0]}</span>
         )}
       </div>
 
@@ -50,13 +37,15 @@ export function TaskCard({ listing }: { listing: Listing }) {
         <div className="task-top">
           <span className={`type-pill type-pill--${listing.type}`}>
             {icon && <img src={icon} alt="" className="type-icon-inline" />}
-            {listing.type}
+            {label}
           </span>
-          <span className="type-pill type-pill--muted">{listing.category}</span>
           {listing.hasSubmitted && <span className="type-pill type-pill--ok">submitted</span>}
         </div>
         <h3 className="task-title">{listing.title}</h3>
-        <p className="task-desc">{listing.description.slice(0, 120)}{listing.description.length > 120 ? '…' : ''}</p>
+        <p className="task-desc">
+          {listing.description.slice(0, 120)}
+          {listing.description.length > 120 ? '…' : ''}
+        </p>
         <div className="task-meta">
           <span>
             <IconClock size={14} /> {daysLeft(listing.deadlineAt)}
@@ -64,7 +53,9 @@ export function TaskCard({ listing }: { listing: Listing }) {
           <span>
             <IconUsers size={14} /> {listing.submitCount ?? 0} submits
           </span>
-          <span>🏆 {winners} winner{winners > 1 ? 's' : ''}</span>
+          <span>
+            🏆 {winners} winner{winners > 1 ? 's' : ''}
+          </span>
           <span className={`diff diff--${difficultyFrom(listing).toLowerCase()}`}>
             {difficultyFrom(listing)}
           </span>

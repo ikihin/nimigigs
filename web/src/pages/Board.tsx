@@ -7,17 +7,7 @@ import { TaskCard } from '../components/TaskCard'
 import { DashboardSidebar } from '../components/DashboardSidebar'
 import { IconSearch } from '../components/Icons'
 
-const CHIPS = [
-  'all',
-  'bounty',
-  'quest',
-  'job',
-  'design',
-  'development',
-  'content',
-  'marketing',
-  'ai',
-] as const
+const CHIPS = ['all', 'bounty', 'quest', 'job'] as const
 
 export function Board() {
   const { user, token, role } = useAuth()
@@ -50,12 +40,6 @@ export function Board() {
 
   const filtered = useMemo(() => {
     let items = [...listings]
-    if (chip === 'design' || chip === 'content' || chip === 'marketing' || chip === 'ai') {
-      items = items.filter((l) => l.category.toLowerCase().includes(chip === 'ai' ? 'ai' : chip))
-    }
-    if (chip === 'development') {
-      items = items.filter((l) => l.category.toLowerCase().includes('dev'))
-    }
     if (currency !== 'all') {
       items = items.filter((l) => l.currency === currency || l.currency === 'BOTH')
     }
@@ -73,7 +57,7 @@ export function Board() {
       items.sort((a, b) => (b.publishedAt || b.createdAt).localeCompare(a.publishedAt || a.createdAt))
     }
     return items
-  }, [listings, chip, currency, difficulty, sort])
+  }, [listings, currency, difficulty, sort])
 
   if (!user) return <Navigate to="/login" replace />
 
@@ -125,13 +109,11 @@ export function Board() {
           />
         </div>
         <div className="search-field">
-          <select value={chip} onChange={(e) => setChip(e.target.value)} aria-label="Category">
-            <option value="all">All categories</option>
-            <option value="design">Design</option>
-            <option value="development">Development</option>
-            <option value="content">Content</option>
-            <option value="marketing">Marketing</option>
-            <option value="ai">AI</option>
+          <select value={chip} onChange={(e) => setChip(e.target.value)} aria-label="Type">
+            <option value="all">All types</option>
+            <option value="bounty">Bounty</option>
+            <option value="quest">Quest</option>
+            <option value="job">Job</option>
           </select>
         </div>
         <div className="search-field">

@@ -54,7 +54,6 @@ export function ListingDetail() {
       </Link>
       <div className="row" style={{ marginTop: 10 }}>
         <span className={`badge ${listing.type}`}>{listing.type}</span>
-        <span className="badge">{listing.category}</span>
       </div>
       <h1 className="page-title">{listing.title}</h1>
       <div className="meta">

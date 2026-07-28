@@ -22,7 +22,6 @@ export function Sponsor() {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [type, setType] = useState<'bounty' | 'quest' | 'job'>('bounty')
-  const [category, setCategory] = useState('design')
   const [currency, setCurrency] = useState<'USDT' | 'NIM'>('USDT')
   const [winnerMode, setWinnerMode] = useState<'single' | 'top3'>('top3')
   const [r1, setR1] = useState(90)
@@ -76,7 +75,7 @@ export function Sponsor() {
         type,
         title,
         description,
-        category,
+        category: type,
         deadlineAt,
         currency,
         winnerMode,
@@ -208,15 +207,6 @@ export function Sponsor() {
                 <option value="bounty">Bounty</option>
                 <option value="quest">Quest</option>
                 <option value="job">Job</option>
-              </select>
-            </div>
-            <div className="field">
-              <label>Category</label>
-              <select value={category} onChange={(e) => setCategory(e.target.value)}>
-                <option value="design">design</option>
-                <option value="content">content</option>
-                <option value="dev">dev</option>
-                <option value="other">other</option>
               </select>
             </div>
             <div className="field create-span-2">
