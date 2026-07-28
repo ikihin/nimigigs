@@ -52,6 +52,20 @@ npm run dev:web
 npm run dev:server
 ```
 
+## Database (Supabase)
+
+Without Supabase env vars the API uses **in-memory** storage (data resets on restart).
+
+1. Create a project at [supabase.com](https://supabase.com)
+2. **SQL Editor** → paste & run `supabase/schema.sql`
+3. **Project Settings → API** copy:
+   - Project URL → `SUPABASE_URL`
+   - `service_role` secret → `SUPABASE_SERVICE_ROLE_KEY`
+4. Put them in `server/.env` (see `.env.example`)
+5. Restart API — log should say `Database: Supabase`
+
+Login/password are stored as **bcrypt hashes** in the `users` table (not plain text).
+
 ## OAuth (Twitter / GitHub)
 
 Copy `.env.example` → `server/.env` (or export env vars), then restart the API.

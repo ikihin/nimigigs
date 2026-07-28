@@ -1,18 +1,30 @@
 import bcrypt from 'bcryptjs'
 import { nanoid } from 'nanoid'
-import { store } from '../db/store.js'
 import type { OAuthAccount, PublicUser, RolePref, User } from '../types.js'
-import { ensureMonth, MONTHLY_GRANT, currentMonthKey } from './credits.js'
-import { onInviteValid } from './credits.js'
+import { ensureMonth, MONTHLY_GRANT, currentMonthKey, onInviteValid } from './credits.js'
+import {
+  createSessionToken,
+  deleteOAuth,
+  findUserByEmail,
+  findUserById,
+  findUserIdByReferral,
+  findUserIdBySession,
+  getOAuthAccount,
+  listReferralsByInvitee,
+  referralCodeExists,
+  saveOAuth,
+  saveReferral,
+  saveUser,
+} from '../db/repo.js'
 
 function makeReferralCode(): string {
   return `GIGS-${nanoid(6).toUpperCase()}`
 }
 
-export function toPublicUser(user: User): PublicUser {
-  ensureMonth(user)
-  const twitter = store.oauth.get(`${user.id}:twitter`)?.username ?? null
-  const github = store.oauth.get(`${user.id}:github`)?.username ?? null
+export async function toPublicUser(user: User): Promise<PublicUser> {
+  await ensureMonth(user)
+  const twitter = (await getOAuthAccount(user.id, 'twitter'))?.username ?? null
+  const github = (await getOAuthAccount(user.id, 'github'))?.username ?? null
   return {
     id: user.id,
     email: user.email,
@@ -40,13 +52,13 @@ export async function createUser(input: {
   referralCode?: string
 }): Promise<User> {
   const email = input.email.trim().toLowerCase()
-  if (store.usersByEmail.has(email)) {
+  if (await findUserByEmail(email)) {
     throw new Error('EMAIL_TAKEN')
   }
 
   let referredBy: string | null = null
   if (input.referralCode?.trim()) {
-    const inviterId = store.usersByReferral.get(input.referralCode.trim().toUpperCase())
+    const inviterId = await findUserIdByReferral(input.referralCode.trim().toUpperCase())
     if (!inviterId) throw new Error('INVALID_REFERRAL')
     referredBy = inviterId
   }
@@ -54,16 +66,17 @@ export async function createUser(input: {
   const now = new Date().toISOString()
   const id = nanoid()
   let code = makeReferralCode()
-  while (store.usersByReferral.has(code)) code = makeReferralCode()
+  while (await referralCodeExists(code)) code = makeReferralCode()
 
   const user: User = {
     id,
     email,
     passwordHash: await bcrypt.hash(input.password, 10),
-    emailVerifiedAt: now, // scaffold: auto-verify
+    emailVerifiedAt: now,
     displayName: input.displayName?.trim() || email.split('@')[0],
     defaultRole: 'freelance',
     nimiqAddress: null,
+    walletProof: null,
     referralCode: code,
     referredByUserId: referredBy,
     creditsBalance: MONTHLY_GRANT,
@@ -74,14 +87,11 @@ export async function createUser(input: {
     updatedAt: now,
   }
 
-  store.users.set(id, user)
-  store.usersByEmail.set(email, id)
-  store.usersByReferral.set(code, id)
+  await saveUser(user)
 
   if (referredBy) {
-    const refId = nanoid()
-    store.referrals.set(refId, {
-      id: refId,
+    await saveReferral({
+      id: nanoid(),
       inviterId: referredBy,
       inviteeId: id,
       status: 'pending',
@@ -95,44 +105,40 @@ export async function createUser(input: {
 }
 
 export async function authenticate(email: string, password: string): Promise<User | null> {
-  const id = store.usersByEmail.get(email.trim().toLowerCase())
-  if (!id) return null
-  const user = store.users.get(id)
+  const user = await findUserByEmail(email.trim().toLowerCase())
   if (!user) return null
   const ok = await bcrypt.compare(password, user.passwordHash)
   return ok ? ensureMonth(user) : null
 }
 
-export function getUser(id: string): User | null {
-  const u = store.users.get(id)
+export async function getUser(id: string): Promise<User | null> {
+  const u = await findUserById(id)
   return u ? ensureMonth(u) : null
 }
 
-export function createSession(userId: string): string {
-  const token = nanoid(32)
-  store.sessions.set(token, userId)
-  return token
+export async function createSession(userId: string): Promise<string> {
+  return createSessionToken(userId)
 }
 
-export function userFromToken(token: string | undefined | null): User | null {
+export async function userFromToken(token: string | undefined | null): Promise<User | null> {
   if (!token) return null
-  const userId = store.sessions.get(token)
+  const userId = await findUserIdBySession(token)
   if (!userId) return null
   return getUser(userId)
 }
 
-export function updateProfile(
+export async function updateProfile(
   user: User,
   patch: { displayName?: string; defaultRole?: RolePref },
-): User {
+): Promise<User> {
   if (patch.displayName !== undefined) user.displayName = patch.displayName.trim()
   if (patch.defaultRole) user.defaultRole = patch.defaultRole
   user.updatedAt = new Date().toISOString()
-  store.users.set(user.id, user)
+  await saveUser(user)
   return user
 }
 
-export function setWallet(
+export async function setWallet(
   user: User,
   address: string,
   proof?: {
@@ -141,7 +147,7 @@ export function setWallet(
     publicKey?: string
     method?: string
   },
-): User {
+): Promise<User> {
   user.nimiqAddress = address.replace(/\s+/g, ' ').trim()
   if (proof?.signature && proof?.message) {
     user.walletProof = {
@@ -153,35 +159,34 @@ export function setWallet(
     }
   }
   user.updatedAt = new Date().toISOString()
-  store.users.set(user.id, user)
-  maybeValidateReferral(user)
+  await saveUser(user)
+  await maybeValidateReferral(user)
   return user
 }
 
-/** Validate referral when invitee has email verified + wallet. */
-export function maybeValidateReferral(invitee: User) {
+export async function maybeValidateReferral(invitee: User) {
   if (!invitee.referredByUserId || !invitee.emailVerifiedAt || !invitee.nimiqAddress) return
 
-  for (const ref of store.referrals.values()) {
-    if (ref.inviteeId !== invitee.id || ref.status === 'valid') continue
+  const refs = await listReferralsByInvitee(invitee.id)
+  for (const ref of refs) {
+    if (ref.status === 'valid') continue
     ref.status = 'valid'
     ref.validatedAt = new Date().toISOString()
-    const inviter = getUser(ref.inviterId)
+    const inviter = await getUser(ref.inviterId)
     if (inviter) {
-      onInviteValid(inviter, invitee.id)
+      await onInviteValid(inviter, invitee.id)
       ref.creditAwarded = true
     }
-    store.referrals.set(ref.id, ref)
+    await saveReferral(ref)
   }
 }
 
-export function connectOAuth(
+export async function connectOAuth(
   user: User,
   provider: 'twitter' | 'github',
   username: string,
   providerUserId?: string,
-): OAuthAccount {
-  const key = `${user.id}:${provider}`
+): Promise<OAuthAccount> {
   const account: OAuthAccount = {
     id: nanoid(),
     userId: user.id,
@@ -190,10 +195,14 @@ export function connectOAuth(
     username: username.replace(/^@/, ''),
     connectedAt: new Date().toISOString(),
   }
-  store.oauth.set(key, account)
+  await saveOAuth(account)
   return account
 }
 
-export function getOAuth(userId: string, provider: 'twitter' | 'github') {
-  return store.oauth.get(`${userId}:${provider}`) ?? null
+export async function getOAuth(userId: string, provider: 'twitter' | 'github') {
+  return getOAuthAccount(userId, provider)
+}
+
+export async function disconnectOAuthProvider(userId: string, provider: 'twitter' | 'github') {
+  await deleteOAuth(userId, provider)
 }

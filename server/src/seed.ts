@@ -1,8 +1,9 @@
 import bcrypt from 'bcryptjs'
 import { nanoid } from 'nanoid'
-import { store } from './db/store.js'
 import type { Listing, RolePref, User } from './types.js'
 import { MONTHLY_GRANT, currentMonthKey } from './services/credits.js'
+import { countUsers, saveListing, saveOAuth, saveUser } from './db/repo.js'
+import { useSupabase } from './db/supabase.js'
 
 async function makeUser(opts: {
   email: string
@@ -22,6 +23,14 @@ async function makeUser(opts: {
     displayName: opts.displayName,
     defaultRole: opts.defaultRole ?? 'freelance',
     nimiqAddress: opts.nimiqAddress ?? null,
+    walletProof: opts.nimiqAddress
+      ? {
+          message: 'seed',
+          signature: 'seed',
+          method: 'demo',
+          verifiedAt: now,
+        }
+      : null,
     referralCode: code,
     referredByUserId: null,
     creditsBalance: MONTHLY_GRANT,
@@ -31,14 +40,16 @@ async function makeUser(opts: {
     createdAt: now,
     updatedAt: now,
   }
-  store.users.set(id, user)
-  store.usersByEmail.set(opts.email, id)
-  store.usersByReferral.set(code, id)
+  await saveUser(user)
   return user
 }
 
 export async function seedDemo() {
-  if (store.users.size > 0) return
+  const n = await countUsers()
+  if (n > 0) {
+    console.log(`[seed] skip — ${n} users already exist (${useSupabase() ? 'supabase' : 'memory'})`)
+    return
+  }
 
   const sponsor = await makeUser({
     email: 'sponsor@nimigigs.demo',
@@ -56,7 +67,7 @@ export async function seedDemo() {
     nimiqAddress: 'NQ07 TEST TALENT DEMO ADDRESS 0002',
   })
 
-  store.oauth.set(`${talent.id}:twitter`, {
+  await saveOAuth({
     id: nanoid(),
     userId: talent.id,
     provider: 'twitter',
@@ -64,8 +75,7 @@ export async function seedDemo() {
     username: 'talentdemo',
     connectedAt: new Date().toISOString(),
   })
-
-  store.oauth.set(`${talent.id}:github`, {
+  await saveOAuth({
     id: nanoid(),
     userId: talent.id,
     provider: 'github',
@@ -85,7 +95,7 @@ export async function seedDemo() {
       title: 'Design a NimGigs logo pack',
       description:
         'Create a simple logo + favicon for NimGigs. Submit Figma or PNG link. Skill-based judging by sponsor.',
-      category: 'design',
+      category: 'bounty',
       status: 'open',
       currency: 'USDT',
       winnerMode: 'top3',
@@ -112,7 +122,7 @@ export async function seedDemo() {
       title: 'Write a thread: What is Nimiq Pay?',
       description:
         'Publish an educational X thread (5+ posts) explaining Nimiq Pay Mini Apps. Link the first tweet.',
-      category: 'content',
+      category: 'quest',
       status: 'open',
       currency: 'NIM',
       winnerMode: 'single',
@@ -134,7 +144,7 @@ export async function seedDemo() {
       type: 'job',
       title: 'Fix responsive layout bugs',
       description: 'Small CSS/React polish gig. Share a PR or demo link. GitHub required.',
-      category: 'dev',
+      category: 'job',
       status: 'open',
       currency: 'USDT',
       winnerMode: 'single',
@@ -152,6 +162,8 @@ export async function seedDemo() {
     },
   ]
 
-  for (const l of listings) store.listings.set(l.id, l)
-  console.log('[seed] demo users: sponsor@nimigigs.demo / talent@nimigigs.demo (password: demo1234)')
+  for (const l of listings) await saveListing(l)
+  console.log(
+    `[seed] demo users ready (${useSupabase() ? 'supabase' : 'memory'}): sponsor@ / talent@nimigigs.demo · demo1234`,
+  )
 }

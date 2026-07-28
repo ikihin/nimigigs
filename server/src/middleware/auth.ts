@@ -11,13 +11,13 @@ export type AppEnv = {
 export async function requireAuth(c: Context<AppEnv>, next: Next) {
   const header = c.req.header('authorization') || ''
   const token = header.startsWith('Bearer ') ? header.slice(7) : null
-  const user = userFromToken(token)
+  const user = await userFromToken(token)
   if (!user) return c.json({ error: { code: 'UNAUTHORIZED', message: 'Login required' } }, 401)
   c.set('user', user)
   await next()
 }
 
-export function optionalAuth(c: Context<AppEnv>) {
+export async function optionalAuth(c: Context<AppEnv>): Promise<User | null> {
   const header = c.req.header('authorization') || ''
   const token = header.startsWith('Bearer ') ? header.slice(7) : null
   return userFromToken(token)

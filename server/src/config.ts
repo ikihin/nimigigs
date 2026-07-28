@@ -11,6 +11,14 @@ export const config = {
   apiPublicUrl,
   /** Allow paste-handle fallback when real OAuth env is missing */
   oauthAllowStub: env('OAUTH_ALLOW_STUB', 'true') === 'true',
+  supabase: {
+    url: env('SUPABASE_URL'),
+    /** Server-only key — never expose to the browser */
+    serviceRoleKey: env('SUPABASE_SERVICE_ROLE_KEY'),
+    enabled() {
+      return Boolean(this.url && this.serviceRoleKey)
+    },
+  },
   github: {
     clientId: env('GITHUB_CLIENT_ID'),
     clientSecret: env('GITHUB_CLIENT_SECRET'),

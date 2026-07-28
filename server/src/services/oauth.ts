@@ -2,6 +2,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import { nanoid } from 'nanoid'
 import { config } from '../config.js'
 import { connectOAuth, getUser, userFromToken } from './users.js'
+// getUser/userFromToken are async
 import type { OAuthProvider } from '../types.js'
 
 interface OAuthState {
@@ -51,7 +52,10 @@ export function takeOAuthState(stateId: string): OAuthState | null {
   return s
 }
 
-export function resolveUserFromOAuthStart(authHeader: string | undefined, queryToken: string | undefined) {
+export async function resolveUserFromOAuthStart(
+  authHeader: string | undefined,
+  queryToken: string | undefined,
+) {
   const token = authHeader?.startsWith('Bearer ')
     ? authHeader.slice(7)
     : queryToken || null
@@ -168,13 +172,13 @@ export async function exchangeTwitterCode(code: string, codeVerifier: string) {
   }
 }
 
-export function linkOAuthAccount(
+export async function linkOAuthAccount(
   userId: string,
   provider: OAuthProvider,
   username: string,
   providerUserId: string,
 ) {
-  const user = getUser(userId)
+  const user = await getUser(userId)
   if (!user) throw new Error('USER_NOT_FOUND')
   return connectOAuth(user, provider, username, providerUserId)
 }

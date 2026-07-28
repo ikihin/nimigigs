@@ -1,5 +1,4 @@
 import { nanoid } from 'nanoid'
-import { store } from '../db/store.js'
 import type {
   Currency,
   Listing,
@@ -11,40 +10,41 @@ import type {
   WinnerMode,
 } from '../types.js'
 import { awardWin, spendSubmit } from './credits.js'
-import { getOAuth } from './users.js'
+import { getOAuth, getUser } from './users.js'
+import {
+  findListing,
+  findSubmission,
+  hasUserSubmitted,
+  listListingsBySponsor,
+  listOpenListings,
+  listSubmissionsByUser,
+  listSubmissionsForListing,
+  saveListing,
+  savePayout,
+  saveSubmission,
+} from '../db/repo.js'
 
-export function listOpen(filters?: {
+export async function listOpen(filters?: {
   type?: ListingType
   category?: string
   q?: string
-}): Listing[] {
-  let items = [...store.listings.values()].filter((l) => l.status === 'open')
-  if (filters?.type) items = items.filter((l) => l.type === filters.type)
-  if (filters?.category) items = items.filter((l) => l.category === filters.category)
-  if (filters?.q) {
-    const q = filters.q.toLowerCase()
-    items = items.filter(
-      (l) => l.title.toLowerCase().includes(q) || l.description.toLowerCase().includes(q),
-    )
-  }
-  return items.sort((a, b) => (b.publishedAt ?? b.createdAt).localeCompare(a.publishedAt ?? a.createdAt))
+}): Promise<Listing[]> {
+  return listOpenListings(filters)
 }
 
-export function getListing(id: string) {
-  return store.listings.get(id) ?? null
+export async function getListing(id: string) {
+  return findListing(id)
 }
 
-export function submissionsForListing(listingId: string) {
-  return [...store.submissions.values()]
-    .filter((s) => s.listingId === listingId)
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+export async function submissionsForListing(listingId: string) {
+  return listSubmissionsForListing(listingId)
 }
 
-export function userHasSubmitted(listingId: string, userId: string) {
-  return [...store.submissions.values()].some((s) => s.listingId === listingId && s.userId === userId)
+export async function userHasSubmitted(listingId: string, userId: string) {
+  return hasUserSubmitted(listingId, userId)
 }
 
-export function createListing(
+export async function createListing(
   sponsor: User,
   input: {
     type: ListingType
@@ -59,14 +59,10 @@ export function createListing(
     requireGithub?: boolean
     rewards: ListingReward[]
   },
-): Listing {
+): Promise<Listing> {
   const now = new Date().toISOString()
   const escrowAmount = input.rewards.reduce((sum, r) => sum + Number(r.amount), 0)
   if (escrowAmount <= 0) throw new Error('INVALID_REWARDS')
-
-  if (input.winnerMode === 'single' && input.rewards.filter((r) => r.amount > 0).length !== 1) {
-    // allow only rank 1
-  }
 
   const listing: Listing = {
     id: nanoid(),
@@ -74,7 +70,7 @@ export function createListing(
     type: input.type,
     title: input.title.trim(),
     description: input.description.trim(),
-    category: input.category.trim() || 'other',
+    category: input.category.trim() || input.type,
     status: 'pending_lock',
     currency: input.currency,
     winnerMode: input.winnerMode,
@@ -94,11 +90,15 @@ export function createListing(
     createdAt: now,
     updatedAt: now,
   }
-  store.listings.set(listing.id, listing)
+  await saveListing(listing)
   return listing
 }
 
-export function lockListing(listing: Listing, sponsorId: string, txHash: string): Listing {
+export async function lockListing(
+  listing: Listing,
+  sponsorId: string,
+  txHash: string,
+): Promise<Listing> {
   if (listing.sponsorId !== sponsorId) throw new Error('FORBIDDEN')
   if (listing.status !== 'pending_lock' && listing.status !== 'draft') {
     throw new Error('INVALID_STATUS')
@@ -108,22 +108,22 @@ export function lockListing(listing: Listing, sponsorId: string, txHash: string)
   listing.status = 'open'
   listing.publishedAt = new Date().toISOString()
   listing.updatedAt = listing.publishedAt
-  store.listings.set(listing.id, listing)
+  await saveListing(listing)
   return listing
 }
 
-export function submitWork(
+export async function submitWork(
   listing: Listing,
   user: User,
   input: { workUrl: string; notes?: string },
-): Submission {
+): Promise<Submission> {
   if (listing.status !== 'open') throw new Error('LISTING_CLOSED')
   if (new Date(listing.deadlineAt).getTime() < Date.now()) throw new Error('LISTING_CLOSED')
-  if (userHasSubmitted(listing.id, user.id)) throw new Error('ALREADY_SUBMITTED')
+  if (await hasUserSubmitted(listing.id, user.id)) throw new Error('ALREADY_SUBMITTED')
   if (!user.nimiqAddress) throw new Error('WALLET_REQUIRED')
 
-  const twitter = getOAuth(user.id, 'twitter')
-  const github = getOAuth(user.id, 'github')
+  const twitter = await getOAuth(user.id, 'twitter')
+  const github = await getOAuth(user.id, 'github')
   if (listing.requireTwitter && !twitter) throw new Error('TWITTER_REQUIRED')
   if (listing.requireGithub && !github) throw new Error('GITHUB_REQUIRED')
 
@@ -135,8 +135,7 @@ export function submitWork(
   }
 
   const id = nanoid()
-  // spend credit first (throws CREDITS_EMPTY)
-  spendSubmit(user, id)
+  await spendSubmit(user, id)
 
   const sub: Submission = {
     id,
@@ -152,15 +151,15 @@ export function submitWork(
     creditSpent: 1,
     createdAt: new Date().toISOString(),
   }
-  store.submissions.set(id, sub)
+  await saveSubmission(sub)
   return sub
 }
 
-export function setWinners(
+export async function setWinners(
   listing: Listing,
   sponsorId: string,
   winners: { submissionId: string; rank: 1 | 2 | 3 }[],
-): Listing {
+): Promise<Listing> {
   if (listing.sponsorId !== sponsorId) throw new Error('FORBIDDEN')
   if (listing.status !== 'open' && listing.status !== 'closed') throw new Error('INVALID_STATUS')
 
@@ -168,41 +167,44 @@ export function setWinners(
   if (new Set(ranks).size !== ranks.length) throw new Error('DUPLICATE_RANK')
 
   for (const w of winners) {
-    const sub = store.submissions.get(w.submissionId)
+    const sub = await findSubmission(w.submissionId)
     if (!sub || sub.listingId !== listing.id) throw new Error('INVALID_SUBMISSION')
     sub.status = 'winner'
     sub.rank = w.rank
-    store.submissions.set(sub.id, sub)
+    await saveSubmission(sub)
   }
 
   listing.status = 'closed'
   listing.updatedAt = new Date().toISOString()
-  store.listings.set(listing.id, listing)
+  await saveListing(listing)
   return listing
 }
 
-export function releasePayouts(listing: Listing, sponsorId: string, demoTxPrefix = 'demo_tx_'): {
-  listing: Listing
-  payouts: ReturnType<typeof buildPayouts>
-} {
+export async function releasePayouts(
+  listing: Listing,
+  sponsorId: string,
+  demoTxPrefix = 'demo_tx_',
+): Promise<{ listing: Listing; payouts: ReturnType<typeof buildPayouts> }> {
   if (listing.sponsorId !== sponsorId) throw new Error('FORBIDDEN')
   if (listing.escrowStatus !== 'locked') throw new Error('ESCROW_NOT_LOCKED')
 
-  const winners = submissionsForListing(listing.id).filter((s) => s.status === 'winner' && s.rank)
+  const winners = (await listSubmissionsForListing(listing.id)).filter(
+    (s) => s.status === 'winner' && s.rank,
+  )
   if (winners.length === 0) throw new Error('NO_WINNERS')
 
   const payouts = buildPayouts(listing, winners, demoTxPrefix)
-  for (const p of payouts) store.payouts.set(p.id, p)
+  for (const p of payouts) await savePayout(p)
 
   for (const w of winners) {
-    const u = store.users.get(w.userId)
-    if (u) awardWin(u, w.id)
+    const u = await getUser(w.userId)
+    if (u) await awardWin(u, w.id)
   }
 
   listing.escrowStatus = 'released'
   listing.status = 'paid'
   listing.updatedAt = new Date().toISOString()
-  store.listings.set(listing.id, listing)
+  await saveListing(listing)
   return { listing, payouts }
 }
 
@@ -227,14 +229,10 @@ function buildPayouts(listing: Listing, winners: Submission[], demoTxPrefix: str
   })
 }
 
-export function listingsBySponsor(sponsorId: string) {
-  return [...store.listings.values()]
-    .filter((l) => l.sponsorId === sponsorId)
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+export async function listingsBySponsor(sponsorId: string) {
+  return listListingsBySponsor(sponsorId)
 }
 
-export function submissionsByUser(userId: string) {
-  return [...store.submissions.values()]
-    .filter((s) => s.userId === userId)
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+export async function submissionsByUser(userId: string) {
+  return listSubmissionsByUser(userId)
 }

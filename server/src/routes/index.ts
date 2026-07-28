@@ -10,6 +10,7 @@ import {
   toPublicUser,
   updateProfile,
   getUser,
+  disconnectOAuthProvider,
 } from '../services/users.js'
 import { ledgerForUser, REFERRAL_CAP_PER_MONTH, REFERRAL_PAIR } from '../services/credits.js'
 import {
@@ -25,8 +26,9 @@ import {
   submitWork,
   userHasSubmitted,
 } from '../services/listings.js'
-import { store } from '../db/store.js'
+import { listPayoutsByUser } from '../db/repo.js'
 import { config } from '../config.js'
+import { useSupabase } from '../db/supabase.js'
 import {
   createOAuthState,
   createPkce,
@@ -68,13 +70,14 @@ api.post('/auth/signup', async (c) => {
       return err(c, 'INVALID_INPUT', 'Email and password (min 6) required', 400)
     }
     const user = await createUser(body)
-    const token = createSession(user.id)
-    return c.json({ token, user: toPublicUser(user) }, 201)
+    const token = await createSession(user.id)
+    return c.json({ token, user: await toPublicUser(user) }, 201)
   } catch (e) {
     const code = e instanceof Error ? e.message : 'ERROR'
     if (code === 'EMAIL_TAKEN') return err(c, code, 'Email already registered', 409)
     if (code === 'INVALID_REFERRAL') return err(c, code, 'Referral code not found', 400)
-    return err(c, 'ERROR', 'Signup failed', 500)
+    console.error(e)
+    return err(c, 'ERROR', code === 'ERROR' ? 'Signup failed' : code, 500)
   }
 })
 
@@ -82,19 +85,19 @@ api.post('/auth/login', async (c) => {
   const body = await c.req.json<{ email: string; password: string }>()
   const user = await authenticate(body.email || '', body.password || '')
   if (!user) return err(c, 'INVALID_CREDENTIALS', 'Invalid email or password', 401)
-  const token = createSession(user.id)
-  return c.json({ token, user: toPublicUser(user) })
+  const token = await createSession(user.id)
+  return c.json({ token, user: await toPublicUser(user) })
 })
 
-api.get('/auth/me', requireAuth, (c) => {
-  return c.json({ user: toPublicUser(c.get('user')) })
+api.get('/auth/me', requireAuth, async (c) => {
+  return c.json({ user: await toPublicUser(c.get('user')) })
 })
 
 // ── Me ────────────────────────────────────────────────
 api.patch('/me', requireAuth, async (c) => {
   const body = await c.req.json<{ displayName?: string; defaultRole?: 'freelance' | 'sponsor' }>()
-  const user = updateProfile(c.get('user'), body)
-  return c.json({ user: toPublicUser(user) })
+  const user = await updateProfile(c.get('user'), body)
+  return c.json({ user: await toPublicUser(user) })
 })
 
 api.post('/me/wallet', requireAuth, async (c) => {
@@ -106,8 +109,6 @@ api.post('/me/wallet', requireAuth, async (c) => {
     method?: string
   }>()
   if (!body.address?.trim()) return err(c, 'INVALID_INPUT', 'Address required', 400)
-  // Prefer signed proof from Hub (hub.nimiq.com/sign-message) or Mini App provider.sign()
-  // Full cryptographic verify can use @nimiq/core against MSG_PREFIX hash in production.
   if (!body.signature || !body.message) {
     return err(
       c,
@@ -119,14 +120,14 @@ api.post('/me/wallet', requireAuth, async (c) => {
   if (!body.message.includes('NimGigs wallet connect')) {
     return err(c, 'INVALID_MESSAGE', 'Unexpected sign message challenge', 400)
   }
-  const user = setWallet(c.get('user'), body.address, {
+  const user = await setWallet(c.get('user'), body.address, {
     message: body.message,
     signature: body.signature,
     publicKey: body.publicKey,
     method: body.method,
   })
   return c.json({
-    user: toPublicUser(user),
+    user: await toPublicUser(user),
     proof: {
       method: body.method,
       address: body.address,
@@ -135,7 +136,7 @@ api.post('/me/wallet', requireAuth, async (c) => {
   })
 })
 
-api.get('/me/credits', requireAuth, (c) => {
+api.get('/me/credits', requireAuth, async (c) => {
   const user = c.get('user')
   const nextCreditAt =
     user.referralInvitesMonth % REFERRAL_PAIR === 0
@@ -148,7 +149,7 @@ api.get('/me/credits', requireAuth, (c) => {
     referralCap: REFERRAL_CAP_PER_MONTH,
     referralInvitesMonth: user.referralInvitesMonth,
     invitesUntilNextCredit: user.referralCreditsMonth >= REFERRAL_CAP_PER_MONTH ? null : nextCreditAt,
-    ledger: ledgerForUser(user.id),
+    ledger: await ledgerForUser(user.id),
   })
 })
 
@@ -163,40 +164,42 @@ api.get('/me/referral', requireAuth, (c) => {
   })
 })
 
-api.get('/me/submissions', requireAuth, (c) => {
-  const subs = submissionsByUser(c.get('user').id).map((s) => ({
-    ...s,
-    listing: getListing(s.listingId),
-  }))
-  return c.json({ submissions: subs })
+api.get('/me/submissions', requireAuth, async (c) => {
+  const raw = await submissionsByUser(c.get('user').id)
+  const submissions = await Promise.all(
+    raw.map(async (s) => ({
+      ...s,
+      listing: await getListing(s.listingId),
+    })),
+  )
+  return c.json({ submissions })
 })
 
-api.get('/me/listings', requireAuth, (c) => {
-  return c.json({ listings: listingsBySponsor(c.get('user').id) })
+api.get('/me/listings', requireAuth, async (c) => {
+  return c.json({ listings: await listingsBySponsor(c.get('user').id) })
 })
 
-api.get('/me/payouts', requireAuth, (c) => {
-  const userId = c.get('user').id
-  const payouts = [...store.payouts.values()].filter((p) => p.userId === userId)
+api.get('/me/payouts', requireAuth, async (c) => {
+  const payouts = await listPayoutsByUser(c.get('user').id)
   return c.json({ payouts })
 })
 
-// ── OAuth (GitHub + Twitter/X) ────────────────────────
+// ── OAuth ─────────────────────────────────────────────
 api.get('/oauth/status', (c) => {
   return c.json({
     github: config.github.enabled(),
     twitter: config.twitter.enabled(),
     allowStub: config.oauthAllowStub,
+    database: useSupabase() ? 'supabase' : 'memory',
   })
 })
 
-/** Start OAuth — pass Bearer token or ?token=JWT (for full-page redirect) */
 api.get('/oauth/:provider/start', async (c) => {
   const provider = c.req.param('provider')
   if (provider !== 'twitter' && provider !== 'github') {
     return err(c, 'INVALID_PROVIDER', 'Use twitter or github', 400)
   }
-  const user = resolveUserFromOAuthStart(
+  const user = await resolveUserFromOAuthStart(
     c.req.header('authorization'),
     c.req.query('token'),
   )
@@ -213,14 +216,12 @@ api.get('/oauth/:provider/start', async (c) => {
     }
     const { codeVerifier, codeChallenge } = createPkce()
     const state = createOAuthState(user.id, 'github', codeVerifier)
-    // codeChallenge unused for GitHub (no PKCE required) but state stores verifier anyway
     void codeChallenge
     const url = githubAuthUrl(state)
     if (c.req.query('redirect') === '1') return c.redirect(url)
     return c.json({ url, provider: 'github' })
   }
 
-  // twitter / X OAuth 2.0 + PKCE
   if (!config.twitter.enabled()) {
     return err(
       c,
@@ -256,7 +257,7 @@ api.get('/oauth/github/callback', async (c) => {
   }
   try {
     const profile = await exchangeGithubCode(code)
-    linkOAuthAccount(st.userId, 'github', profile.username, profile.providerUserId)
+    await linkOAuthAccount(st.userId, 'github', profile.username, profile.providerUserId)
     return c.redirect(
       oauthFrontendRedirect({ ok: true, provider: 'github', username: profile.username }),
     )
@@ -286,7 +287,7 @@ api.get('/oauth/twitter/callback', async (c) => {
   }
   try {
     const profile = await exchangeTwitterCode(code, st.codeVerifier)
-    linkOAuthAccount(st.userId, 'twitter', profile.username, profile.providerUserId)
+    await linkOAuthAccount(st.userId, 'twitter', profile.username, profile.providerUserId)
     return c.redirect(
       oauthFrontendRedirect({ ok: true, provider: 'twitter', username: profile.username }),
     )
@@ -296,7 +297,6 @@ api.get('/oauth/twitter/callback', async (c) => {
   }
 })
 
-/** Fallback: paste handle (only if OAUTH_ALLOW_STUB=true or OAuth not configured) */
 api.post('/oauth/:provider/connect', requireAuth, async (c) => {
   const provider = c.req.param('provider')
   if (provider !== 'twitter' && provider !== 'github') {
@@ -305,17 +305,12 @@ api.post('/oauth/:provider/connect', requireAuth, async (c) => {
   const configured =
     provider === 'github' ? config.github.enabled() : config.twitter.enabled()
   if (configured && !config.oauthAllowStub) {
-    return err(
-      c,
-      'USE_OAUTH_FLOW',
-      `Use GET /oauth/${provider}/start for real OAuth`,
-      400,
-    )
+    return err(c, 'USE_OAUTH_FLOW', `Use GET /oauth/${provider}/start for real OAuth`, 400)
   }
   const body = await c.req.json<{ username: string }>()
   if (!body.username?.trim()) return err(c, 'INVALID_INPUT', 'username required', 400)
-  const account = connectOAuth(c.get('user'), provider, body.username)
-  return c.json({ account, user: toPublicUser(c.get('user')), stub: true })
+  const account = await connectOAuth(c.get('user'), provider, body.username)
+  return c.json({ account, user: await toPublicUser(c.get('user')), stub: true })
 })
 
 api.delete('/oauth/:provider', requireAuth, async (c) => {
@@ -323,33 +318,36 @@ api.delete('/oauth/:provider', requireAuth, async (c) => {
   if (provider !== 'twitter' && provider !== 'github') {
     return err(c, 'INVALID_PROVIDER', 'Use twitter or github', 400)
   }
-  store.oauth.delete(`${c.get('user').id}:${provider}`)
-  return c.json({ ok: true, user: toPublicUser(c.get('user')) })
+  await disconnectOAuthProvider(c.get('user').id, provider)
+  return c.json({ ok: true, user: await toPublicUser(c.get('user')) })
 })
 
 // ── Listings ──────────────────────────────────────────
-api.get('/listings', (c) => {
+api.get('/listings', async (c) => {
   const type = c.req.query('type') as 'bounty' | 'quest' | 'job' | undefined
   const category = c.req.query('category') || undefined
   const q = c.req.query('q') || undefined
-  const user = optionalAuth(c)
-  const listings = listOpen({ type, category, q }).map((l) => ({
-    ...l,
-    submitCount: submissionsForListing(l.id).length,
-    hasSubmitted: user ? userHasSubmitted(l.id, user.id) : false,
-  }))
+  const user = await optionalAuth(c)
+  const open = await listOpen({ type, category, q })
+  const listings = await Promise.all(
+    open.map(async (l) => ({
+      ...l,
+      submitCount: (await submissionsForListing(l.id)).length,
+      hasSubmitted: user ? await userHasSubmitted(l.id, user.id) : false,
+    })),
+  )
   return c.json({ listings })
 })
 
-api.get('/listings/:id', (c) => {
-  const listing = getListing(listingId(c))
+api.get('/listings/:id', async (c) => {
+  const listing = await getListing(listingId(c))
   if (!listing) return err(c, 'NOT_FOUND', 'Listing not found', 404)
-  const user = optionalAuth(c)
+  const user = await optionalAuth(c)
   return c.json({
     listing: {
       ...listing,
-      submitCount: submissionsForListing(listing.id).length,
-      hasSubmitted: user ? userHasSubmitted(listing.id, user.id) : false,
+      submitCount: (await submissionsForListing(listing.id)).length,
+      hasSubmitted: user ? await userHasSubmitted(listing.id, user.id) : false,
     },
   })
 })
@@ -357,7 +355,7 @@ api.get('/listings/:id', (c) => {
 api.post('/listings', requireAuth, async (c) => {
   const body = await c.req.json()
   try {
-    const listing = createListing(c.get('user'), body)
+    const listing = await createListing(c.get('user'), body)
     return c.json({ listing }, 201)
   } catch (e) {
     const code = e instanceof Error ? e.message : 'ERROR'
@@ -366,11 +364,11 @@ api.post('/listings', requireAuth, async (c) => {
 })
 
 api.post('/listings/:id/lock', requireAuth, async (c) => {
-  const listing = getListing(listingId(c))
+  const listing = await getListing(listingId(c))
   if (!listing) return err(c, 'NOT_FOUND', 'Listing not found', 404)
   const body = await c.req.json<{ escrowTxHash: string }>()
   try {
-    const updated = lockListing(
+    const updated = await lockListing(
       listing,
       c.get('user').id,
       body.escrowTxHash || `demo_lock_${Date.now()}`,
@@ -383,12 +381,12 @@ api.post('/listings/:id/lock', requireAuth, async (c) => {
 })
 
 api.post('/listings/:id/submissions', requireAuth, async (c) => {
-  const listing = getListing(listingId(c))
+  const listing = await getListing(listingId(c))
   if (!listing) return err(c, 'NOT_FOUND', 'Listing not found', 404)
   const body = await c.req.json<{ workUrl: string; notes?: string }>()
   try {
-    const submission = submitWork(listing, c.get('user'), body)
-    return c.json({ submission, user: toPublicUser(c.get('user')) }, 201)
+    const submission = await submitWork(listing, c.get('user'), body)
+    return c.json({ submission, user: await toPublicUser(c.get('user')) }, 201)
   } catch (e) {
     const code = e instanceof Error ? e.message : 'ERROR'
     const messages: Record<string, string> = {
@@ -404,30 +402,33 @@ api.post('/listings/:id/submissions', requireAuth, async (c) => {
   }
 })
 
-api.get('/listings/:id/submissions', requireAuth, (c) => {
-  const listing = getListing(listingId(c))
+api.get('/listings/:id/submissions', requireAuth, async (c) => {
+  const listing = await getListing(listingId(c))
   if (!listing) return err(c, 'NOT_FOUND', 'Listing not found', 404)
   if (listing.sponsorId !== c.get('user').id) {
     return err(c, 'FORBIDDEN', 'Sponsor only', 403)
   }
-  const submissions = submissionsForListing(listing.id).map((s) => ({
-    ...s,
-    user: (() => {
-      const u = getUser(s.userId)
-      return u
-        ? { id: u.id, displayName: u.displayName, nimiqAddress: u.nimiqAddress }
-        : null
-    })(),
-  }))
+  const raw = await submissionsForListing(listing.id)
+  const submissions = await Promise.all(
+    raw.map(async (s) => {
+      const u = await getUser(s.userId)
+      return {
+        ...s,
+        user: u
+          ? { id: u.id, displayName: u.displayName, nimiqAddress: u.nimiqAddress }
+          : null,
+      }
+    }),
+  )
   return c.json({ submissions })
 })
 
 api.post('/listings/:id/winners', requireAuth, async (c) => {
-  const listing = getListing(listingId(c))
+  const listing = await getListing(listingId(c))
   if (!listing) return err(c, 'NOT_FOUND', 'Listing not found', 404)
   const body = await c.req.json<{ winners: { submissionId: string; rank: 1 | 2 | 3 }[] }>()
   try {
-    const updated = setWinners(listing, c.get('user').id, body.winners || [])
+    const updated = await setWinners(listing, c.get('user').id, body.winners || [])
     return c.json({ listing: updated })
   } catch (e) {
     const code = e instanceof Error ? e.message : 'ERROR'
@@ -436,10 +437,10 @@ api.post('/listings/:id/winners', requireAuth, async (c) => {
 })
 
 api.post('/listings/:id/release', requireAuth, async (c) => {
-  const listing = getListing(listingId(c))
+  const listing = await getListing(listingId(c))
   if (!listing) return err(c, 'NOT_FOUND', 'Listing not found', 404)
   try {
-    const result = releasePayouts(listing, c.get('user').id)
+    const result = await releasePayouts(listing, c.get('user').id)
     return c.json(result)
   } catch (e) {
     const code = e instanceof Error ? e.message : 'ERROR'
@@ -447,4 +448,10 @@ api.post('/listings/:id/release', requireAuth, async (c) => {
   }
 })
 
-api.get('/health', (c) => c.json({ ok: true, service: 'nimigigs-api' }))
+api.get('/health', (c) =>
+  c.json({
+    ok: true,
+    service: 'nimigigs-api',
+    database: useSupabase() ? 'supabase' : 'memory',
+  }),
+)
