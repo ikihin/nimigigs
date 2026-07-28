@@ -29,10 +29,7 @@ export function Login() {
   return (
     <div className="auth-shell">
       <div className="auth-brand">
-        <div className="mark">
-          <img src="/ng-mark.svg" alt="" />
-        </div>
-        <img src="/logo-nimigigs.svg" alt="NimGigs" className="word" />
+        <img src="/ng-mark.svg" alt="NimGigs" className="auth-logo-only" />
         <p className="muted" style={{ margin: 0 }}>
           Complete tasks. Earn rewards.
         </p>

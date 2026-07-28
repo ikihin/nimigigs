@@ -38,8 +38,7 @@ export function Landing() {
           <span className="particle" />
           <span className="particle" />
           <div className="hero-orb">
-            <img src="/ng-mark.svg" alt="" />
-            <span className="wordmark">NimGigs</span>
+            <img src="/ng-mark.svg" alt="NimGigs" />
           </div>
         </div>
       </section>

@@ -125,33 +125,32 @@ textarea {
 .logo {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
   flex-shrink: 0;
+  line-height: 0;
 }
 
-.logo-mark {
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
-  background: linear-gradient(145deg, rgba(255, 196, 0, 0.2), rgba(255, 196, 0, 0.05));
-  border: 1px solid var(--border);
-  display: grid;
-  place-items: center;
-  box-shadow: var(--glow);
-}
-
-.logo-mark img {
-  width: 22px;
-  height: 22px;
-  object-fit: contain;
-  filter: drop-shadow(0 0 8px rgba(255, 196, 0, 0.45));
-}
-
-.logo-word {
-  height: 28px;
+/* Mark-only brand (NG monogram) */
+.logo-only {
+  height: 42px;
   width: auto;
-  max-width: 120px;
+  max-width: 56px;
   object-fit: contain;
+  filter: drop-shadow(0 0 12px rgba(255, 196, 0, 0.35));
+  transition: filter 0.2s, transform 0.2s;
+}
+
+.logo:hover .logo-only {
+  filter: drop-shadow(0 0 18px rgba(255, 196, 0, 0.55));
+  transform: scale(1.04);
+}
+
+.auth-logo-only {
+  width: 88px;
+  height: auto;
+  max-height: 100px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 28px rgba(255, 196, 0, 0.4));
+  margin-bottom: 4px;
 }
 
 .nav-links {
@@ -484,20 +483,10 @@ textarea {
 }
 
 .hero-orb img {
-  width: 58%;
+  width: 72%;
   height: auto;
-  filter: drop-shadow(0 0 24px rgba(255, 196, 0, 0.5));
-}
-
-.hero-orb .wordmark {
-  position: absolute;
-  bottom: 18px;
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 0.95rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.7);
+  object-fit: contain;
+  filter: drop-shadow(0 0 28px rgba(255, 196, 0, 0.55));
 }
 
 @keyframes float-y {
@@ -1187,26 +1176,7 @@ textarea {
   text-align: center;
 }
 
-.auth-brand img.word {
-  height: 40px;
-  width: auto;
-}
 
-.auth-brand .mark {
-  width: 56px;
-  height: 56px;
-  border-radius: 18px;
-  border: 1px solid var(--border);
-  background: rgba(255, 196, 0, 0.08);
-  display: grid;
-  place-items: center;
-  box-shadow: var(--glow);
-}
-
-.auth-brand .mark img {
-  width: 32px;
-  height: 32px;
-}
 
 /* ─── Landing public ─── */
 .landing-hero {
@@ -1275,8 +1245,8 @@ textarea {
     padding: 6px 8px;
     font-size: 0.72rem;
   }
-  .logo-word {
-    display: none;
+  .logo-only {
+    height: 36px;
   }
 }
 
