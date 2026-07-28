@@ -19,6 +19,8 @@ export function toPublicUser(user: User): PublicUser {
     displayName: user.displayName,
     defaultRole: user.defaultRole,
     nimiqAddress: user.nimiqAddress,
+    walletLinked: Boolean(user.nimiqAddress && user.walletProof?.signature),
+    walletMethod: user.walletProof?.method ?? null,
     referralCode: user.referralCode,
     creditsBalance: user.creditsBalance,
     creditsMonth: user.creditsMonth,
@@ -130,8 +132,26 @@ export function updateProfile(
   return user
 }
 
-export function setWallet(user: User, address: string): User {
+export function setWallet(
+  user: User,
+  address: string,
+  proof?: {
+    message?: string
+    signature?: string
+    publicKey?: string
+    method?: string
+  },
+): User {
   user.nimiqAddress = address.replace(/\s+/g, ' ').trim()
+  if (proof?.signature && proof?.message) {
+    user.walletProof = {
+      message: proof.message,
+      signature: proof.signature,
+      publicKey: proof.publicKey,
+      method: proof.method || 'unknown',
+      verifiedAt: new Date().toISOString(),
+    }
+  }
   user.updatedAt = new Date().toISOString()
   store.users.set(user.id, user)
   maybeValidateReferral(user)

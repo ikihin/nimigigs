@@ -7,6 +7,8 @@ export interface PublicUser {
   displayName: string
   defaultRole: RolePref
   nimiqAddress: string | null
+  walletLinked?: boolean
+  walletMethod?: string | null
   referralCode: string
   creditsBalance: number
   creditsMonth: string

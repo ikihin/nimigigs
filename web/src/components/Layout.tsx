@@ -1,10 +1,13 @@
 import { NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useWallet } from '../context/WalletContext'
 import { IconBell, IconMessage } from './Icons'
 import { PageTransition } from './PageTransition'
+import { formatAddress } from '../lib/nimiq'
 
 export function Layout() {
   const { user, role, setRole, logout } = useAuth()
+  const { connectWallet, status } = useWallet()
   const loc = useLocation()
   const isAuthPage = loc.pathname === '/login' || loc.pathname === '/signup'
 
@@ -37,6 +40,24 @@ export function Layout() {
                 <IconBell size={18} />
                 <span className="dot" />
               </button>
+              {user.nimiqAddress ? (
+                <NavLink to="/profile" className="credit-chip" title="Wallet connected">
+                  <span aria-hidden>◈</span>
+                  <strong style={{ fontSize: '0.78rem', fontWeight: 600 }}>
+                    {formatAddress(user.nimiqAddress)}
+                  </strong>
+                </NavLink>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  disabled={status === 'connecting'}
+                  onClick={() => void connectWallet().catch(() => undefined)}
+                  title="Connect via Nimiq Hub sign-message"
+                >
+                  {status === 'connecting' ? 'Signing…' : 'Connect wallet'}
+                </button>
+              )}
               <NavLink to="/credits" className="credit-chip" title="Credits">
                 <span aria-hidden>⚡</span>
                 <strong>{user.creditsBalance}</strong>

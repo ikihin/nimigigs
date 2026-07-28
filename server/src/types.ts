@@ -25,6 +25,13 @@ export interface User {
   displayName: string
   defaultRole: RolePref
   nimiqAddress: string | null
+  walletProof?: {
+    message: string
+    signature: string
+    publicKey?: string
+    method: string
+    verifiedAt: string
+  } | null
   referralCode: string
   referredByUserId: string | null
   creditsBalance: number
@@ -129,6 +136,8 @@ export interface PublicUser {
   displayName: string
   defaultRole: RolePref
   nimiqAddress: string | null
+  walletLinked: boolean
+  walletMethod: string | null
   referralCode: string
   creditsBalance: number
   creditsMonth: string

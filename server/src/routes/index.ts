@@ -85,11 +85,41 @@ api.patch('/me', requireAuth, async (c) => {
 })
 
 api.post('/me/wallet', requireAuth, async (c) => {
-  const body = await c.req.json<{ address: string; signature?: string; message?: string }>()
+  const body = await c.req.json<{
+    address: string
+    signature?: string
+    message?: string
+    publicKey?: string
+    method?: string
+  }>()
   if (!body.address?.trim()) return err(c, 'INVALID_INPUT', 'Address required', 400)
-  // Scaffold: signature optional; verify message in production
-  const user = setWallet(c.get('user'), body.address)
-  return c.json({ user: toPublicUser(user) })
+  // Prefer signed proof from Hub (hub.nimiq.com/sign-message) or Mini App provider.sign()
+  // Full cryptographic verify can use @nimiq/core against MSG_PREFIX hash in production.
+  if (!body.signature || !body.message) {
+    return err(
+      c,
+      'SIGNATURE_REQUIRED',
+      'Sign a message with your Nimiq wallet (Hub or Nimiq Pay) to connect',
+      400,
+    )
+  }
+  if (!body.message.includes('NimGigs wallet connect')) {
+    return err(c, 'INVALID_MESSAGE', 'Unexpected sign message challenge', 400)
+  }
+  const user = setWallet(c.get('user'), body.address, {
+    message: body.message,
+    signature: body.signature,
+    publicKey: body.publicKey,
+    method: body.method,
+  })
+  return c.json({
+    user: toPublicUser(user),
+    proof: {
+      method: body.method,
+      address: body.address,
+      hasSignature: true,
+    },
+  })
 })
 
 api.get('/me/credits', requireAuth, (c) => {

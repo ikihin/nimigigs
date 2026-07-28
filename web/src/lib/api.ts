@@ -51,11 +51,23 @@ export const api = {
       body: JSON.stringify(body),
     })
   },
-  setWallet(token: string, address: string) {
+  setWallet(
+    token: string,
+    body:
+      | string
+      | {
+          address: string
+          message?: string
+          signature?: string
+          publicKey?: string
+          method?: string
+        },
+  ) {
+    const payload = typeof body === 'string' ? { address: body } : body
     return request<{ user: PublicUser }>('/me/wallet', {
       method: 'POST',
       token,
-      body: JSON.stringify({ address }),
+      body: JSON.stringify(payload),
     })
   },
   credits(token: string) {

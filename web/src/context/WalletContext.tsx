@@ -9,16 +9,18 @@ import {
 } from 'react'
 import type { NimiqProvider } from '@nimiq/mini-app-sdk'
 import {
+  connectAndSign,
   formatAddress,
   initNimiq,
   isInsideNimiqPay,
   listAccountsSafe,
   sendNim,
+  type WalletProof,
 } from '../lib/nimiq'
 import { useAuth } from './AuthContext'
 import { api } from '../lib/api'
 
-export type WalletStatus = 'loading' | 'ready' | 'demo' | 'error'
+export type WalletStatus = 'loading' | 'ready' | 'demo' | 'error' | 'connecting'
 
 interface WalletContextValue {
   status: WalletStatus
@@ -26,8 +28,13 @@ interface WalletContextValue {
   address: string | null
   displayAddress: string
   isDemo: boolean
+  isConnected: boolean
   error: string | null
+  lastProof: WalletProof | null
   refresh: () => Promise<void>
+  /** Opens Nimiq Pay or Hub (hub.nimiq.com) sign-message, then binds address to account */
+  connectWallet: () => Promise<void>
+  /** @deprecated use connectWallet */
   bindWalletToAccount: () => Promise<void>
   payNim: (amountNim: number, recipient: string) => Promise<string>
 }
@@ -40,13 +47,13 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [provider, setProvider] = useState<NimiqProvider | null>(null)
   const [address, setAddress] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [lastProof, setLastProof] = useState<WalletProof | null>(null)
 
   const refresh = useCallback(async () => {
     setError(null)
     const p = await initNimiq()
     if (!p) {
       setProvider(null)
-      // Demo fallback address from linked account or generated
       setAddress(user?.nimiqAddress ?? null)
       setStatus('demo')
       return
@@ -54,7 +61,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     try {
       const accounts = await listAccountsSafe(p)
       setProvider(p)
-      setAddress(accounts[0] ?? null)
+      setAddress(accounts[0] ?? user?.nimiqAddress ?? null)
       setStatus('ready')
     } catch (e) {
       setProvider(p)
@@ -68,27 +75,45 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     void refresh()
   }, [refresh])
 
-  const bindWalletToAccount = useCallback(async () => {
-    if (!token) throw new Error('Login required')
-    let addr = address
-    if (!addr && status === 'demo') {
-      addr = `NQ07 DEMO ${crypto.randomUUID().replace(/-/g, '').slice(0, 20).toUpperCase()}`
-      setAddress(addr)
+  const connectWallet = useCallback(async () => {
+    if (!token || !user) throw new Error('Login required')
+    setStatus('connecting')
+    setError(null)
+    try {
+      const proof = await connectAndSign(user.id)
+      setLastProof(proof)
+      setAddress(proof.address)
+      const { user: u } = await api.setWallet(token, {
+        address: proof.address,
+        message: proof.message,
+        signature: proof.signature,
+        publicKey: proof.publicKey,
+        method: proof.method,
+      })
+      setUser(u)
+      setStatus(proof.method === 'demo' ? 'demo' : isInsideNimiqPay() ? 'ready' : 'demo')
+      // re-probe provider after hub connect
+      void refresh()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Connect failed')
+      setStatus(isInsideNimiqPay() ? 'error' : 'demo')
+      throw e
     }
-    if (!addr) throw new Error('No wallet address')
-    const { user: u } = await api.setWallet(token, addr)
-    setUser(u)
-  }, [token, address, status, setUser])
+  }, [token, user, setUser, refresh])
+
+  const bindWalletToAccount = connectWallet
 
   const payNim = useCallback(
     async (amountNim: number, recipient: string) => {
-      if (!provider || status === 'demo') {
+      if (!provider || status === 'demo' || status === 'connecting') {
         return `demo_tx_${Date.now()}`
       }
       return sendNim({ provider, recipient, amountNim })
     },
     [provider, status],
   )
+
+  const linked = Boolean(user?.nimiqAddress || address)
 
   const value = useMemo(
     () => ({
@@ -100,15 +125,30 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         : user?.nimiqAddress
           ? formatAddress(user.nimiqAddress)
           : status === 'demo'
-            ? 'Demo mode'
+            ? 'Not connected'
             : '—',
       isDemo: status === 'demo',
+      isConnected: linked,
       error,
+      lastProof,
       refresh,
+      connectWallet,
       bindWalletToAccount,
       payNim,
     }),
-    [status, provider, address, user?.nimiqAddress, error, refresh, bindWalletToAccount, payNim],
+    [
+      status,
+      provider,
+      address,
+      user?.nimiqAddress,
+      linked,
+      error,
+      lastProof,
+      refresh,
+      connectWallet,
+      bindWalletToAccount,
+      payNim,
+    ],
   )
 
   return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>
