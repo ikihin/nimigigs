@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import type { Listing } from '../lib/types'
+import { typeIconSrc } from '../lib/typeIcons'
 import { IconArrow, IconClock, IconUsers } from './Icons'
 
 const art: Record<string, string> = {
@@ -27,20 +28,30 @@ function difficultyFrom(listing: Listing) {
 }
 
 export function TaskCard({ listing }: { listing: Listing }) {
+  const icon = typeIconSrc(listing.type)
   const mark = art[listing.category] || art[listing.type] || art.other
   const winners = listing.winnerMode === 'top3' ? 3 : 1
   const currency = listing.currency === 'BOTH' ? 'MIX' : listing.currency
 
   return (
     <Link to={`/listings/${listing.id}`} className="task-card">
-      <div className={`task-art task-art--${listing.type}`} aria-hidden>
-        <span className="task-art__glyph">{mark}</span>
-        <div className="task-art__hex" />
+      <div className={`task-art task-art--${listing.type}${icon ? ' task-art--icon' : ''}`} aria-hidden>
+        {icon ? (
+          <img src={icon} alt="" className="task-art__icon" />
+        ) : (
+          <>
+            <span className="task-art__glyph">{mark}</span>
+            <div className="task-art__hex" />
+          </>
+        )}
       </div>
 
       <div className="task-body">
         <div className="task-top">
-          <span className={`type-pill type-pill--${listing.type}`}>{listing.type}</span>
+          <span className={`type-pill type-pill--${listing.type}`}>
+            {icon && <img src={icon} alt="" className="type-icon-inline" />}
+            {listing.type}
+          </span>
           <span className="type-pill type-pill--muted">{listing.category}</span>
           {listing.hasSubmitted && <span className="type-pill type-pill--ok">submitted</span>}
         </div>

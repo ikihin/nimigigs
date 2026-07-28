@@ -737,6 +737,28 @@ textarea {
   opacity: 0.7;
 }
 
+.task-art--icon {
+  background: radial-gradient(circle at 35% 30%, rgba(255, 196, 0, 0.14), #0a0a0a 72%);
+  padding: 10px;
+}
+
+.task-art__icon {
+  width: 72%;
+  height: 72%;
+  object-fit: contain;
+  filter: drop-shadow(0 0 12px rgba(255, 196, 0, 0.35));
+  z-index: 1;
+}
+
+/* Small bounty mark in type pills (optional helper class) */
+.type-icon-inline {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  vertical-align: -2px;
+  margin-right: 4px;
+}
+
 .task-body {
   min-width: 0;
 }

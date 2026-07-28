@@ -5,6 +5,7 @@ import type { Listing, Submission } from '../lib/types'
 import { useAuth } from '../context/AuthContext'
 import { useWallet } from '../context/WalletContext'
 import { IconBriefcase, IconTrophy, IconUsers } from '../components/Icons'
+import { typeIconSrc } from '../lib/typeIcons'
 
 export function Sponsor() {
   const { user, token } = useAuth()
@@ -306,9 +307,17 @@ export function Sponsor() {
         {visible.length === 0 && <div className="empty-state">No listings in this filter.</div>}
         {visible.map((l) => (
           <article key={l.id} className="task-card sponsor-card">
-            <div className={`task-art task-art--${l.type}`}>
-              <span className="task-art__glyph">{l.type[0].toUpperCase()}</span>
-              <div className="task-art__hex" />
+            <div
+              className={`task-art task-art--${l.type}${typeIconSrc(l.type) ? ' task-art--icon' : ''}`}
+            >
+              {typeIconSrc(l.type) ? (
+                <img src={typeIconSrc(l.type)!} alt="" className="task-art__icon" />
+              ) : (
+                <>
+                  <span className="task-art__glyph">{l.type[0].toUpperCase()}</span>
+                  <div className="task-art__hex" />
+                </>
+              )}
             </div>
             <div className="task-body">
               <div className="task-top">
